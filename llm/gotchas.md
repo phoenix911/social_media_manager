@@ -34,7 +34,7 @@ permission, which we deliberately don't grant.
 
 ### 3. Worker custom domain conflicts with Pages
 
-**Symptom.** `wrangler deploy` fails because `smm.table.pw` is
+**Symptom.** `wrangler deploy` fails because `smm.example.com` is
 "already in use."
 
 **Cause.** Pages had bound the domain. Cloudflare doesn't allow
@@ -67,8 +67,8 @@ curl -X PUT \
 
 ### 5. CF Access cookies don't cross subdomains
 
-**Symptom.** When we ran `smm.table.pw` (web) and
-`api.smm.table.pw` (api) as separate Access apps, the user had to
+**Symptom.** When we ran `smm.example.com` (web) and
+`api.smm.example.com` (api) as separate Access apps, the user had to
 log in twice (once per hostname) on first visit.
 
 **Cause.** Each Access app has its own per-hostname `CF_AppSession`
@@ -76,7 +76,7 @@ cookie. The team SSO cookie is shared, so the *second* login is
 silent (no second OTP) — but it still happens, with a brief
 redirect dance.
 
-**Fix.** Consolidated to ONE hostname (`smm.table.pw`) serving both
+**Fix.** Consolidated to ONE hostname (`smm.example.com`) serving both
 SPA + API from the same Worker via `[assets]`. One Access app, one
 cookie, one login. **Don't go back to the split-domain model
 without a strong reason.**
@@ -201,8 +201,8 @@ The unique index `accounts_unique` is on those three columns.
 
 ### 14. Web app paths are relative
 
-**Symptom.** API calls in production try to hit `https://smm.table.pw/api/…` from the SPA — works because we're now same-origin.
+**Symptom.** API calls in production try to hit `https://smm.example.com/api/…` from the SPA — works because we're now same-origin.
 
-**Cause.** Single Worker serves both SPA + API at `smm.table.pw`. SPA uses relative `/api/...` paths. No CORS, no separate API base URL, no `VITE_API_BASE` env.
+**Cause.** Single Worker serves both SPA + API at `smm.example.com`. SPA uses relative `/api/...` paths. No CORS, no separate API base URL, no `VITE_API_BASE` env.
 
 **Fix.** **Don't introduce a separate API hostname** without re-architecting auth. The whole point of consolidation was that everything is one origin.

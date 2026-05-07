@@ -33,8 +33,8 @@ registration.
    - **App permissions:** **Read and write** (NOT just Read).
      Direct Message off unless you actually need it.
    - **Type of App:** **Web App, Automated App or Bot**
-   - **Callback URI:** `https://smm.table.pw/api/oauth/twitter/callback`
-   - **Website URL:** `https://smm.table.pw`
+   - **Callback URI:** `https://smm.example.com/api/oauth/twitter/callback`
+   - **Website URL:** `https://smm.example.com`
    - Save.
 6. After saving, the page reveals **OAuth 2.0 Client ID + Client
    Secret** — save these too.

@@ -63,12 +63,9 @@ const ApiKeysCard = () => {
       </div>
 
       <p className="text-xs text-muted-foreground mb-3">
-        Keys let an LLM (or any HTTP client) create projects, tracks, and drafts on your
-        behalf. They cannot read or modify anything else. See{" "}
-        <a href="https://github.com/phoenix911/social_media_manager/blob/main/mcp.md" target="_blank" rel="noreferrer" className="underline">
-          mcp.md
-        </a>{" "}
-        for usage.
+        Keys let an LLM (or any HTTP client) read + create + edit projects, tracks, and drafts
+        on your behalf. They cannot delete anything or touch channels / media / OAuth. See{" "}
+        <a href="/mcp" className="underline">/mcp</a> for the document to paste into your LLM.
       </p>
 
       {creating && (

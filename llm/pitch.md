@@ -7,7 +7,7 @@ team. Hosted entirely on Cloudflare for ~$5/month.
 
 ## The shape
 
-- **One Worker** at `smm.table.pw` serves both the React SPA (static
+- **One Worker** at `smm.example.com` serves both the React SPA (static
   assets) and the `/api/*` routes. Same hostname, same auth, no CORS.
 - **Cloudflare Access** with **One-time PIN** gates the whole
   hostname. Every request must carry a CF Access JWT cookie. Worker
@@ -47,7 +47,7 @@ manual and scattered across platform UIs. This consolidates it.
 
 ## What "works" right now without any platform credentials
 
-- Login via OTP at `https://smm.table.pw`.
+- Login via OTP at `https://smm.example.com`.
 - Create projects, write drafts, save markdown, schedule for a
   future time, see them in a calendar view.
 - The cron handler will pick them up at the right minute → fail

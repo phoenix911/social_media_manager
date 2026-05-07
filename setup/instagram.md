@@ -30,9 +30,9 @@ this is Meta policy, not our limitation.
 3. **App name:** `SMM` · **App contact email:** your email · **Business
    Account:** pick yours (or skip if no business account).
 4. After creation: **App settings → Basic**:
-   - **App Domains:** `smm.table.pw`
-   - **Privacy Policy URL:** `https://smm.table.pw/privacy` (placeholder)
-   - **Terms of Service URL:** `https://smm.table.pw/terms` (placeholder)
+   - **App Domains:** `smm.example.com`
+   - **Privacy Policy URL:** `https://smm.example.com/privacy` (placeholder)
+   - **Terms of Service URL:** `https://smm.example.com/terms` (placeholder)
    - **Category:** Productivity
    - **App Icon:** any 1024×1024
 5. **Add product → Instagram API with Instagram Login → Set up.**
@@ -40,9 +40,9 @@ this is Meta policy, not our limitation.
    deprecated for posting.)
 6. Under that product → **API setup with Instagram business
    login → Generate token** — this gets you to the OAuth config:
-   - Add **OAuth Redirect URI:** `https://smm.table.pw/api/oauth/instagram/callback`
-   - Add **Deauthorize Callback:** `https://smm.table.pw/api/oauth/instagram/deauthorize` (optional but Meta nags)
-   - Add **Data Deletion Request URL:** `https://smm.table.pw/api/oauth/instagram/delete` (optional)
+   - Add **OAuth Redirect URI:** `https://smm.example.com/api/oauth/instagram/callback`
+   - Add **Deauthorize Callback:** `https://smm.example.com/api/oauth/instagram/deauthorize` (optional but Meta nags)
+   - Add **Data Deletion Request URL:** `https://smm.example.com/api/oauth/instagram/delete` (optional)
 7. **Copy from App settings → Basic:**
    - **App ID** — use as `META_APP_ID`
    - **App Secret** — use as `META_APP_SECRET`

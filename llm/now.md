@@ -8,7 +8,7 @@ Forward-looking roadmap lives in `../new_plan.md`.
 
 ## Live URL
 
-`https://smm.table.pw` — single Cloudflare Worker serving the SPA + API.
+`https://smm.example.com` — single Cloudflare Worker serving the SPA + API.
 Whole hostname is gated by Cloudflare Access (One-time PIN); the
 `/api/telegram/*` path has a separate Access app with a bypass policy
 so Telegram's webhook can reach the Worker.
@@ -74,7 +74,7 @@ page to share visibility.
 
 Owners (visibility):
 - `paper-games` / `tapeline` — owner from project creator's email
-- `neura-care` / **Founders** — `sangeet.verma91@gmail.com`, `tech@neuera.care`, `saurav@neuera.care`
+- `neura-care` / **Founders** — `you@example.com`, `tech@neuera.care`, `saurav@neuera.care`
 
 ## Pages (web)
 
@@ -182,7 +182,7 @@ POST   /api/telegram/:secret                    (CF Access bypass)
 - **DateTime UI** wraps every timestamp render with a red-marker highlight (`web/src/components/DateTime.tsx` + `.dt` class).
 - **CopyChip** click-to-copy chip used in setup steps (e.g. redirect URI to paste into the platform console).
 - **Image upload fix**: SW NetworkOnly for `/api/*` on all methods, body sent as `ArrayBuffer`, detailed error reporting.
-- **ACL fix**: `sangeet.verma91@gmail.com` removed from `neura-care.project_members` so neura-care visibility is owner-email-only.
+- **ACL fix**: `you@example.com` removed from `neura-care.project_members` so neura-care visibility is owner-email-only.
 
 ## Deploy state
 

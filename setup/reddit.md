@@ -35,8 +35,8 @@ can't run the OAuth flow. With them, any project member can connect
    - **name:** `smm` (or whatever you like — only you see this)
    - **type:** select **web app** (not script, not installed)
    - **description:** optional
-   - **about url:** `https://smm.table.pw`
-   - **redirect uri:** `https://smm.table.pw/api/oauth/reddit/callback`
+   - **about url:** `https://smm.example.com`
+   - **redirect uri:** `https://smm.example.com/api/oauth/reddit/callback`
 5. Click **create app**.
 6. The new card shows two values:
    - **client id** — short string under the app name (looks like `j3K…`)
@@ -62,7 +62,7 @@ wrangler deploy
 
 ## Verify
 
-1. Open `https://smm.table.pw` in browser.
+1. Open `https://smm.example.com` in browser.
 2. Pick or create a project.
 3. Go to `/p/<slug>/accounts`.
 4. Click **+ connect** next to Reddit.
@@ -79,8 +79,8 @@ If you see 503 instead, the secret didn't propagate — re-run
 
 - **Type must be "web app"** — "script" type has no callback URL,
   used for personal scripts only.
-- **Redirect URI is exact-match.** `https://smm.table.pw/...` won't
-  match `https://www.smm.table.pw/...`. The trailing path also has
+- **Redirect URI is exact-match.** `https://smm.example.com/...` won't
+  match `https://www.smm.example.com/...`. The trailing path also has
   to match exactly: `/api/oauth/reddit/callback`.
 - **Reddit User-Agent must be unique + identifiable.** We auto-build
   it as `web:smm:0.1 (by /u/<REDDIT_USERNAME_FOR_UA>)`. Generic UAs

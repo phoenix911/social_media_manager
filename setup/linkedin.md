@@ -25,14 +25,14 @@ they can finalize either in our UI or in LinkedIn's own composer.
 3. Fill in:
    - **App name:** `SMM` (or whatever)
    - **LinkedIn Page:** the company page from pre-reqs
-   - **Privacy policy URL:** `https://smm.table.pw/privacy` (we don't
+   - **Privacy policy URL:** `https://smm.example.com/privacy` (we don't
      have one yet — use any working URL; LinkedIn doesn't validate
      content for personal-scope apps)
    - **App logo:** any 100×100 image
    - Tick the legal agreement → **Create app**
 4. In the new app page, go to the **Auth** tab.
 5. Under **OAuth 2.0 settings → Authorized redirect URLs**, add:
-   `https://smm.table.pw/api/oauth/linkedin/callback`
+   `https://smm.example.com/api/oauth/linkedin/callback`
    Save.
 6. Go to the **Products** tab. Request these two — both are
    instant-approval:

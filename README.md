@@ -5,7 +5,7 @@ Worker hosts the SPA + API. Drafts are written in Markdown, organised by
 **Project → Track → Draft**, scheduled in UTC, published via platform APIs,
 and gated by Cloudflare Access (One-time PIN to email).
 
-Live: <https://smm.table.pw> (private; gated by CF Access).
+Live: <https://smm.example.com> (private; gated by CF Access).
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/phoenix911/social_media_manager)
 

@@ -29,12 +29,12 @@ Conventions:
 
 ### Cloudflare
 - [x] Project account `7985cc18…` + API token with all required scopes
-- [x] `table.pw` zone Active
+- [x] `example.com` zone Active
 - [x] R2 enabled, Zero Trust enabled (team `tablepw`)
 - [x] D1 `smm`, KV `smm-kv`, R2 `smm-media`
 - [x] Queue `smm-publish`
 - [x] Cron triggers — `* * * * *` (publish) + `30 3 * * *` (reminders 9am IST)
-- [x] CF Access app `smm-web` covering `smm.table.pw`
+- [x] CF Access app `smm-web` covering `smm.example.com`
 - [x] CF Access app `smm-telegram-webhook` (bypass for `/api/telegram/*`)
 
 ### Code scaffold
@@ -44,7 +44,7 @@ Conventions:
 - [x] `api/` — Hono + Drizzle + wrangler config, AES-GCM crypto, JWT verifier
 - [x] `web/` — Vite + React + Tailwind v4 + shadcn-style primitives
 - [x] **All IDs are UUIDv7** (`api/src/lib/ids.ts`)
-- [x] **Single Worker** at `smm.table.pw` serving SPA + API (`[assets]` binding)
+- [x] **Single Worker** at `smm.example.com` serving SPA + API (`[assets]` binding)
 - [x] CF Access gates the whole hostname (One-time PIN)
 
 ---
@@ -204,7 +204,7 @@ Conventions:
 - [x] Per-reminder Telegram target (numeric or `@username`)
 - [x] Message: today's pending + last-7-days still-pending across user's projects
 - [x] Reminders UI at `/reminders` — add/edit/disable/delete + "test" button
-- [x] Pre-seeded reminder targeting `@pnx911`
+- [x] Pre-seeded reminder targeting `@your-telegram-handle`
 
 ### Token health
 - [x] Lazy refresh on use (Reddit / LinkedIn / Twitter)
@@ -238,7 +238,7 @@ Conventions:
 - [x] **Tapeline** project — 11-draft "Product Hunt launch" track from `measure_app/producthunt/*`. Track start = next Wed 12:30 IST.
 - [x] Tapeline + "Launch in YVS WhatsApp group" track with 2 drafts (today 1pm IST + Sat 1pm IST).
 - [x] **neuera.care** project (slug `neuera-care`) — three tracks (Adhoc, gynaegoddess, Instagram ads); **Founders** owner with `tech@neuera.care` + `saurav@neuera.care`.
-- [x] Daily reminder seeded for `@pnx911`.
+- [x] Daily reminder seeded for `@your-telegram-handle`.
 
 ---
 

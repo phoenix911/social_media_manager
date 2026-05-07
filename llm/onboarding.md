@@ -10,7 +10,7 @@ Edit `api/wrangler.local.toml`. The relevant line:
 
 ```toml
 [vars]
-WEBAUTHN_ALLOWED_EMAILS = "sangeet.verma91@gmail.com,tech@neuera.care,saurav@neuera.care"
+WEBAUTHN_ALLOWED_EMAILS = "you@example.com,tech@neuera.care,saurav@neuera.care"
 ```
 
 Append the new email comma-separated. The match is case-insensitive
@@ -32,11 +32,11 @@ Takes ~15 s. No DB migration, no secret change.
 
 ## 3. Tell the user what to do
 
-> Go to <https://smm.table.pw/login>. Type your email, click
-> **email me a code**, paste the 6-digit code from `auth@table.pw`,
+> Go to <https://smm.example.com/login>. Type your email, click
+> **email me a code**, paste the 6-digit code from `auth@example.com`,
 > then add a passkey when prompted.
 
-They'll receive an OTP from `auth@table.pw` (Resend, verified domain).
+They'll receive an OTP from `auth@example.com` (Resend, verified domain).
 After OTP success the UI prompts to register a passkey on the device.
 Subsequent logins use the passkey directly — no email needed.
 

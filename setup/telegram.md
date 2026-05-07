@@ -89,7 +89,7 @@ inbound messages:
 ```sh
 TOKEN=<bot token>
 SECRET=<your webhook secret>
-curl -F "url=https://smm.table.pw/api/telegram/${SECRET}" \
+curl -F "url=https://smm.example.com/api/telegram/${SECRET}" \
      "https://api.telegram.org/bot${TOKEN}/setWebhook"
 ```
 

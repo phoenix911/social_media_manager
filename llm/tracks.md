@@ -41,7 +41,7 @@ bun x wrangler d1 execute smm --remote -c wrangler.local.toml --json \
 
 # Your user id (= track.created_by, draft.created_by)
 bun x wrangler d1 execute smm --remote -c wrangler.local.toml --json \
-  --command "SELECT id FROM users WHERE email = 'sangeet.verma91@gmail.com';"
+  --command "SELECT id FROM users WHERE email = 'you@example.com';"
 ```
 
 ### 2. Generate UUIDv7s
@@ -156,7 +156,7 @@ draft's `scheduled_for`).
 
 ### 1. Grab a session cookie
 
-You need a passkey login first. Open <https://smm.table.pw> in a
+You need a passkey login first. Open <https://smm.example.com> in a
 browser, sign in, then open devtools → Application → Cookies →
 copy the value of `smm_sess`.
 
@@ -167,14 +167,14 @@ export SMM_COOKIE="smm_sess=<paste-here>"
 ### 2. Find the project + account ids (no SQL needed)
 
 ```bash
-curl -sS https://smm.table.pw/api/projects -H "Cookie: $SMM_COOKIE" | jq '.projects[] | {id, slug, name}'
-curl -sS https://smm.table.pw/api/accounts -H "Cookie: $SMM_COOKIE" | jq '.accounts[] | {id, platform, handle}'
+curl -sS https://smm.example.com/api/projects -H "Cookie: $SMM_COOKIE" | jq '.projects[] | {id, slug, name}'
+curl -sS https://smm.example.com/api/accounts -H "Cookie: $SMM_COOKIE" | jq '.accounts[] | {id, platform, handle}'
 ```
 
 ### 3. Create the track
 
 ```bash
-TRACK_ID=$(curl -sS -X POST https://smm.table.pw/api/tracks \
+TRACK_ID=$(curl -sS -X POST https://smm.example.com/api/tracks \
   -H "Cookie: $SMM_COOKIE" -H "Content-Type: application/json" \
   -d '{
     "projectId":   "019716c0-...",
@@ -190,7 +190,7 @@ echo "track: $TRACK_ID"
 ### 4. Create drafts
 
 ```bash
-curl -sS -X POST https://smm.table.pw/api/drafts \
+curl -sS -X POST https://smm.example.com/api/drafts \
   -H "Cookie: $SMM_COOKIE" -H "Content-Type: application/json" \
   -d @- <<JSON
 {

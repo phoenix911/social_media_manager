@@ -23,6 +23,7 @@ import Owners from "./pages/Owners";
 import Reminders from "./pages/Reminders";
 import Calendar from "./pages/Calendar";
 import Login from "./pages/Login";
+import Mcp from "./pages/Mcp";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/mcp" element={<Mcp />} />
           <Route path="/" element={<App />}>
             <Route index element={<HomePage />} />
             <Route path="reminders" element={<Reminders />} />

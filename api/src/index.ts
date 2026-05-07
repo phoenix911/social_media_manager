@@ -1,5 +1,5 @@
 // Worker entrypoint. Same Worker serves the SPA static assets and the
-// /api/* routes — same hostname (smm.table.pw), same Access app, same
+// /api/* routes — same hostname (smm.example.com), same Access app, same
 // JWT cookie. No CORS, one auth.
 
 import { Hono } from "hono";

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "cp ../mcp.md public/mcp.md && tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler pages deploy dist --project-name=smm-web"

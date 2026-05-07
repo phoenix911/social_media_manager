@@ -36,7 +36,7 @@ and add a real publish path — out of scope for the default install.
 3. Click **Add an application**.
 4. Fill:
    - **Name:** `SMM`
-   - **Redirect URI:** `https://smm.table.pw/api/oauth/producthunt/callback`
+   - **Redirect URI:** `https://smm.example.com/api/oauth/producthunt/callback`
 5. Submit.
 6. The application detail page now shows two values:
    - **API Key** (= Client ID for OAuth)

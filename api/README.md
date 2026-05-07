@@ -1,6 +1,6 @@
 # @smm/api
 
-Cloudflare Worker on `api.smm.table.pw`. Hono + Drizzle on D1.
+Cloudflare Worker on `api.smm.example.com`. Hono + Drizzle on D1.
 
 ## Layout
 

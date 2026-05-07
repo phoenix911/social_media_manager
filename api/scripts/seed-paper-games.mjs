@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const REDDIT_DIR = join(here, "../../../paper_games/app_distribution/reddit");
 
-const SEED_EMAIL = "sangeet.verma91@gmail.com";
+const SEED_EMAIL = "you@example.com";
 const SEED_PROJECT_SLUG = "paper-games";
 const SEED_PROJECT_NAME = "Paper Games";
 const SEED_PROJECT_DESC =

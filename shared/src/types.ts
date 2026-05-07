@@ -135,7 +135,7 @@ export interface Publish {
 export interface Reminder {
   id: string;
   userId: string;
-  telegramTarget: string;       // "6566454636" or "@pnx911"
+  telegramTarget: string;       // "6566454636" or "@your-telegram-handle"
   label: string | null;
   kind: "daily_pending";
   enabled: boolean;

@@ -8,7 +8,7 @@
 // Usage:  bun api/scripts/seed-tapeline.mjs > api/scripts/seed-tapeline.sql
 // Apply:  wrangler d1 execute smm --remote --file=api/scripts/seed-tapeline.sql
 
-const SEED_EMAIL = "sangeet.verma91@gmail.com";
+const SEED_EMAIL = "you@example.com";
 const SEED_SLUG = "tapeline";
 const SEED_NAME = "Tapeline";
 const SEED_DESC =

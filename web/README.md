@@ -1,7 +1,7 @@
 # @smm/web
 
 React + Vite frontend, deployed to Cloudflare Pages at
-`smm.table.pw`.
+`smm.example.com`.
 
 ## Stack
 
@@ -60,7 +60,7 @@ bun run deploy           # → wrangler pages deploy dist --project-name=smm-web
 ```
 
 Pages will be served from `https://smm-web.pages.dev` until we bind
-a custom domain (`smm.table.pw`) in the dash.
+a custom domain (`smm.example.com`) in the dash.
 
 ## What's NOT in here yet
 

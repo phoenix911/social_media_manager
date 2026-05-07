@@ -21,7 +21,7 @@ export interface PlatformMeta {
   oauth: "recommended" | "manual_only";
 }
 
-const REDIRECT = (platform: Platform) => `https://smm.table.pw/api/oauth/${platform}/callback`;
+const REDIRECT = (platform: Platform) => `https://smm.example.com/api/oauth/${platform}/callback`;
 
 export const PLATFORMS_META: PlatformMeta[] = [
   {

@@ -5,7 +5,7 @@ each milestone.
 
 ## Pre-work (before week 1)
 
-- Decide the production domain (e.g. `smm.appstudios.co`,
+- Decide the production domain (e.g. `smm.<your-cf-account>.co`,
   `social.z6o.cc`, etc.). ⚠ **Need user input.**
 - Buy the domain or point an existing zone at Cloudflare.
 - Open the platform dev portals and start the slow ones:
