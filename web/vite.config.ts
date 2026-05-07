@@ -52,17 +52,18 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//],
+        // Workbox-routed runtimeCaching is intentionally limited to
+        // static assets. /api/* is NOT registered — without a matching
+        // route the SW does not call respondWith on those requests,
+        // so the browser handles them natively. Earlier we tried
+        // `NetworkOnly` for /api/*; that surfaced "no-response" errors
+        // on PUT uploads where Workbox's strategy wrapper choked on
+        // the request body. Best fix: stay out of the way.
         runtimeCaching: [
-          // Force every /api/* request — including PUT/POST uploads —
-          // to bypass the SW. Some browsers route Blob-bodied PUTs
-          // through the SW's fetch handler in unpredictable ways.
-          { urlPattern: /\/api\//, handler: "NetworkOnly", method: "GET" },
-          { urlPattern: /\/api\//, handler: "NetworkOnly", method: "POST" },
-          { urlPattern: /\/api\//, handler: "NetworkOnly", method: "PUT" },
-          { urlPattern: /\/api\//, handler: "NetworkOnly", method: "DELETE" },
           {
-            // Static assets cached for fast repeat loads.
-            urlPattern: ({ request }) => ["style", "script", "image", "font"].includes(request.destination),
+            urlPattern: ({ request, url }) =>
+              !url.pathname.startsWith("/api/") &&
+              ["style", "script", "image", "font"].includes(request.destination),
             handler: "StaleWhileRevalidate",
             options: { cacheName: "smm-static" },
           },
