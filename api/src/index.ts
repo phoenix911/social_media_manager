@@ -19,6 +19,7 @@ import telegramRoutes from "./routes/telegram.ts";
 import ownerRoutes from "./routes/owners.ts";
 import reminderRoutes from "./routes/reminders.ts";
 import authRoutes from "./routes/auth.ts";
+import apiKeyRoutes from "./routes/api-keys.ts";
 import { runScheduler } from "./scheduler/cron.ts";
 import { handlePublishBatch } from "./scheduler/queue.ts";
 import { runReminders } from "./scheduler/reminders.ts";
@@ -42,11 +43,44 @@ app.route("/api/telegram", telegramRoutes);
 // requireUser internally (register start/finish).
 app.route("/api/auth", authRoutes);
 
-// All other /api/* routes require a verified session (CF Access JWT
-// or WebAuthn cookie depending on AUTH_MODE).
+// All other /api/* routes require a verified session (CF Access JWT,
+// WebAuthn cookie, or Bearer API key depending on AUTH_MODE / header).
 app.use("/api/*", requireUser);
 
+// MCP / API-key scope guard. When the request authed via Bearer key,
+// allow only read+write on projects / tracks / drafts. Everything
+// else (media, oauth, accounts, owners, reminders, schedule, the
+// api-keys CRUD itself) returns 403 even if the key is valid.
+// DELETE is also blocked — LLM tool-use is happy to call it on
+// flimsy reasoning and the blast radius is too large.
+app.use("/api/*", async (c, next) => {
+  if (!c.var.viaApiKey) return next();
+  const path = new URL(c.req.url).pathname;
+  const method = c.req.method;
+  const onScopedPath =
+    path === "/api/projects" ||
+    path.startsWith("/api/projects/") ||
+    path === "/api/tracks" ||
+    path.startsWith("/api/tracks/") ||
+    path === "/api/drafts" ||
+    path.startsWith("/api/drafts/");
+  const allowedMethod = method === "GET" || method === "POST" || method === "PATCH";
+  if (!onScopedPath || !allowedMethod) {
+    return c.json(
+      {
+        error: {
+          code: "forbidden",
+          message: `api keys are scoped to GET/POST/PATCH on /api/projects, /api/tracks, /api/drafts (got ${method} ${path})`,
+        },
+      },
+      403,
+    );
+  }
+  return next();
+});
+
 app.route("/api/me", meRoutes);
+app.route("/api/api-keys", apiKeyRoutes);
 app.route("/api/projects", projectRoutes);
 app.route("/api/tracks", trackRoutes);
 app.route("/api/drafts", draftRoutes);

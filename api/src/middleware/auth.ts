@@ -7,17 +7,21 @@
 // Routes that need auth call this; the public health endpoint skips it.
 
 import type { Context, MiddlewareHandler } from "hono";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Env } from "../env.ts";
 import { db, schema } from "../db/index.ts";
 import { verifyAccess } from "../lib/access.ts";
 import { Unauthorized } from "../lib/errors.ts";
 import { cookieName, readCookie, verifySession } from "../lib/session.ts";
+import { hashApiKey } from "../lib/api-keys.ts";
 import type { User } from "@smm/shared";
 
 declare module "hono" {
   interface ContextVariableMap {
     user: User;
+    /** True when this request authed via API key (Bearer token).
+     *  Routes outside the MCP scope must throw 403 when this is set. */
+    viaApiKey: boolean;
   }
 }
 
@@ -79,9 +83,48 @@ const authViaSessionCookie = async (c: Context<{ Bindings: Env }>): Promise<User
   return rowToUser(row);
 };
 
+const authViaApiKey = async (c: Context<{ Bindings: Env }>): Promise<User | null> => {
+  const auth = c.req.header("Authorization");
+  if (!auth?.startsWith("Bearer ")) return null;
+  const plaintext = auth.slice(7).trim();
+  if (!plaintext.startsWith("smm_")) return null;
+  const hash = await hashApiKey(plaintext);
+  const env = c.env;
+  const row = await db(env.DB)
+    .select()
+    .from(schema.apiKeys)
+    .where(and(eq(schema.apiKeys.hash, hash), isNull(schema.apiKeys.revokedAt)))
+    .get();
+  if (!row) throw Unauthorized("invalid api key");
+  await db(env.DB)
+    .update(schema.apiKeys)
+    .set({ lastUsedAt: new Date().toISOString() })
+    .where(eq(schema.apiKeys.id, row.id))
+    .run();
+  const userRow = await db(env.DB).select().from(schema.users).where(eq(schema.users.id, row.userId)).get();
+  if (!userRow) throw Unauthorized("api key user gone");
+  return rowToUser(userRow);
+};
+
 export const requireUser: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  // Bearer token wins if present — lets a paired session+key request
+  // still resolve as the API-key principal so scope guards apply.
+  const apiKeyUser = await authViaApiKey(c);
+  if (apiKeyUser) {
+    c.set("user", apiKeyUser);
+    c.set("viaApiKey", true);
+    await next();
+    return;
+  }
+  c.set("viaApiKey", false);
   const mode = c.env.AUTH_MODE ?? "cf_access";
   const user = mode === "webauthn" ? await authViaSessionCookie(c) : await authViaCfAccess(c);
   c.set("user", user);
+  await next();
+};
+
+// Used by routes outside the MCP-scoped subset to reject API-key auth.
+export const requireSessionAuth: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  if (c.var.viaApiKey) throw new (await import("../lib/errors.ts")).HttpError(403, "forbidden", "api keys cannot access this route");
   await next();
 };

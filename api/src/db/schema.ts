@@ -345,6 +345,34 @@ export const reminders = sqliteTable(
   }),
 );
 
+// API keys for programmatic / MCP access. The plaintext is shown to
+// the user exactly once at creation; the row stores SHA-256(key) so
+// a DB read leak doesn't yield usable credentials. `prefix` is the
+// first 12 chars of the plaintext (`smm_` + 8) so we can show a
+// recognisable hint in the UI without revealing the secret.
+//
+// Keys are user-scoped and confer a *strict subset* of session
+// privileges: only POST /api/projects, /api/tracks, /api/drafts.
+// Enforced in middleware via the `viaApiKey` flag.
+export const apiKeys = sqliteTable(
+  "api_keys",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull(),
+    hash: text("hash").notNull().unique(),
+    createdAt: text("created_at").notNull().default(now),
+    lastUsedAt: text("last_used_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (t) => ({
+    userIdx: index("idx_api_keys_user").on(t.userId),
+  }),
+);
+
 // WebAuthn (passkey) credentials. One user can register many devices.
 // public_key is the COSE-encoded credential public key, base64url.
 // sign_count is the device's monotonically-increasing counter — we

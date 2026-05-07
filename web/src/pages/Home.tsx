@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProjectStore } from "@/store/projectStore";
 import { VersionTag } from "@/components/VersionTag";
+import ApiKeysCard from "@/components/ApiKeysCard";
 
 const ProjectTile = ({ project, onPick }: { project: Project; onPick: () => void }) => {
   const { data: aData } = useSWR<{ accounts: Account[] }>(`/api/accounts?projectId=${project.id}`);
@@ -150,6 +151,8 @@ const HomePage = () => {
           </ul>
         )}
       </section>
+
+      <ApiKeysCard />
 
       <section>
         <div className="flex items-center justify-between mb-3 gap-3">
