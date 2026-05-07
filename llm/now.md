@@ -76,16 +76,43 @@ Owners (visibility):
 - `paper-games` / `tapeline` — owner from project creator's email
 - `neura-care` / **Founders** — `you@example.com`, `tech@neuera.care`, `saurav@neuera.care`
 
+## Auth
+
+`AUTH_MODE = "webauthn"` is the live mode (Worker var). The whole
+hostname is **no longer** behind Cloudflare Access — that app was
+deleted when we flipped to passkey. The only CF Access app left is the
+bypass policy on `/api/telegram/*` so Telegram can reach the webhook.
+
+- Sign-in lives at `/login`. Two paths: passkey (existing device) or
+  email-OTP via Resend (verified domain `auth@<your-domain>`) on a
+  fresh device — OTP success prompts to register a passkey.
+- Session = signed cookie (HMAC-SHA256, 7-day TTL via
+  `SESSION_TTL_SECONDS`). Verified by `requireUser`.
+- **`requireUser` also accepts `Authorization: Bearer smm_<hex>`**
+  (programmatic / MCP). When the request authed via Bearer key, an
+  index-level scope guard restricts it to `GET / POST / PATCH` on
+  `/api/projects`, `/api/tracks`, `/api/drafts`. Anything else → 403.
+- Allowlist for new-user signup is a static comma-list at
+  `WEBAUTHN_ALLOWED_EMAILS`; case-insensitive. Today: `you@example.com`,
+  `tech@neuera.care`, `saurav@neuera.care`.
+- Hot-path optimisation: cookie → user lookup is cached in KV for 60s
+  (key = first 80 chars of the signed cookie). Saves a D1 SELECT per
+  authed request.
+
 ## Pages (web)
 
 ```
-/                              project picker (channel pills + track count)
+/                              project picker + channels + api keys card + reminders link
+/login                         passkey + email-OTP (public, no session needed)
+/mcp                           renders mcp.md as paste-into-LLM context (public)
+/channels                      add a new channel (OAuth or manual paste)
 /p/:slug                       tracks list (with "+ new track")
 /p/:slug/t/:trackId            track detail — edit start_at + drafts ordered by sequence
 /p/:slug/draft/:id             draft editor (track + channel selector, offset picker, preview)
 /p/:slug/calendar              scheduled drafts grouped by day
-/p/:slug/channels              connect / disconnect platform channels (visible to me)
+/p/:slug/channels              link existing channels into this project (link-only)
 /p/:slug/owners                manage owners + emails
+/reminders                     telegram reminders CRUD
 ```
 
 Mobile-friendly: header collapses to hamburger ≤640px; columns stack;
@@ -116,6 +143,20 @@ Commands (all driven by inline-button menu):
 
 ```
 GET    /api/me
+
+# auth (no session required for the public sub-routes)
+POST   /api/auth/email-otp/start            { email }
+POST   /api/auth/email-otp/finish           { email, code }   → sets cookie
+POST   /api/auth/webauthn/register/start    (session required)
+POST   /api/auth/webauthn/register/finish
+POST   /api/auth/webauthn/login/start       { email }
+POST   /api/auth/webauthn/login/finish      { email, response } → sets cookie
+POST   /api/auth/logout
+
+# programmatic access (passkey session required to mint a key)
+GET    /api/api-keys
+POST   /api/api-keys                        { name } → plaintext returned ONCE
+DELETE /api/api-keys/:id
 
 GET    /api/projects
 POST   /api/projects
@@ -174,14 +215,21 @@ POST   /api/telegram/:secret                    (CF Access bypass)
 - `0004_*` / `0005_*` — project_accounts (channel ↔ project many-to-many) + reminders
 - `0006_lazy_the_executioner` — `accounts.project_id` and `owners.project_id` made nullable (channels are user-level, link into projects)
 - `0007_worthless_black_queen` — `platform_apps` table (encrypted OAuth client config) + `accounts.platform_app_id` FK
+- `0008_passkeys` — `user_credentials` (WebAuthn devices) + `auth_challenges` (login / register / email-OTP)
+- `0009_api_keys` — programmatic API keys (sha256-hashed at rest)
 
 ## Recent shape changes (2026-05-08)
 
-- **Channels are project-independent**: created at `/channels`, linked into projects at `/p/:slug/channels`. `accounts.project_id` is nullable; `owners.project_id` is nullable for global owners.
-- **`platform_apps`**: OAuth client_id/secret moved from Worker secrets to encrypted DB rows so we can register multiple apps per platform without redeploying. Helper at `api/src/lib/platform-apps.ts` (`getAppConfig` falls back to env vars if no DB row).
+- **Auth flipped to passkey** (`AUTH_MODE=webauthn`). CF Access app on the hostname deleted; only the `/api/telegram/*` bypass remains.
+- **Programmatic / MCP API** — `Authorization: Bearer smm_<hex>` accepted on `requireUser`. Scope guard in `index.ts` restricts API-key requests to `GET / POST / PATCH` on `/api/projects`, `/api/tracks`, `/api/drafts`. DELETE blocked. New `mcp.md` (paste-into-LLM context) shipped as a static asset rendered at `/mcp`.
+- **Performance pass**: session→user cached in KV 60s; raw D1 prepared statements on every hot read path; JOIN-fused role checks. **p99 14.05 ms → 7.43 ms (-47%)** on the 15-min post-deploy window.
+- **Public-template scrub**: `api/wrangler.toml` ships with `example.com` placeholders + empty resource ids. Live values live in gitignored `api/wrangler.local.toml` and `DEPLOY_STATE.md`. `web/wrangler.toml` deleted (Pages no longer used).
+- **Worker observability** enabled (`[observability.logs] enabled = true, invocation_logs = true`).
+- **Channels are project-independent**: created at `/channels`, linked into projects at `/p/:slug/channels`. `accounts.project_id` and `owners.project_id` are nullable.
+- **`platform_apps`**: OAuth client_id/secret moved from Worker secrets to encrypted DB rows. Helper at `api/src/lib/platform-apps.ts` (`getAppConfig` falls back to env vars if no DB row). UI to manage the rows is still pending (top of `new_plan.md`).
 - **DateTime UI** wraps every timestamp render with a red-marker highlight (`web/src/components/DateTime.tsx` + `.dt` class).
-- **CopyChip** click-to-copy chip used in setup steps (e.g. redirect URI to paste into the platform console).
-- **Image upload fix**: SW NetworkOnly for `/api/*` on all methods, body sent as `ArrayBuffer`, detailed error reporting.
+- **CopyChip** click-to-copy chip used in setup steps (redirect URIs etc.).
+- **Image upload fix (round 2)**: PUT body is the `File` itself (not `ArrayBuffer`) to dodge the iOS PWA RAM cap on fetch bodies; cache-bust on the URL. Service worker no longer intercepts `/api/*` at all (no Workbox route → browser handles natively).
 - **ACL fix**: `you@example.com` removed from `neura-care.project_members` so neura-care visibility is owner-email-only.
 
 ## Deploy state

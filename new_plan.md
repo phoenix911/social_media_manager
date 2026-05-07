@@ -1,105 +1,186 @@
-# new_plan — forward-looking features
+# new_plan — forward roadmap
 
-A living list of features we want next. Roughly ordered by priority. Each
-entry has a one-line *why* so the order can be re-litigated. Items move to
-`CHECKLIST.md` once they ship.
+Functionality first, UI/UX last. "Now" is what blocks a real publish or
+onboarding flow today. UI polish and integrations beyond the existing
+five platforms wait. Items move to `CHECKLIST.md` once they ship.
 
-## Now (next 1–2 sessions)
+## Now — functional unblockers
 
-### Platform-apps UI (`/admin/oauth-apps`)
-Manage OAuth client credentials from the web instead of via Worker secrets.
-Schema and `getAppConfig()` already exist (`platform_apps` table, migration
-0007); this is the wiring + the UI.
-- `GET /api/platform-apps` — list (label + platform; never decrypt to client)
-- `POST /api/platform-apps` — write encrypted config
-- `PATCH /api/platform-apps/:id` — relabel / archive
-- Web page with one card per platform, "+ add app", reveal-only redirect URI
+The publishing pipeline is wired but has gaps that surface only when
+you actually try to post. These remove those gaps.
+
+### 1. Token refresh on use
+Every adapter currently posts with whatever access token is on the
+account row. After ~8 hours / 60 days (varies by platform) those
+silently 401 mid-publish.
+- Adapter checks `account.expiresAt`; if `< now + 5m`, calls `refresh()`
+  and writes the new tokens back via `insertAccount`/AES-GCM encrypt
+  before posting.
+- Centralise in a wrapper `withFreshTokens(adapter, account, fn)` so
+  every publisher path goes through it.
+- Reddit, LinkedIn, Twitter, Instagram all need this. Product Hunt has
+  no refresh.
+
+### 2. Platform-apps UI
+Schema (`platform_apps`) and `getAppConfig()` exist, no UI to manage
+them, and adapters still read `env.X_CLIENT_ID` directly.
+- `GET /api/platform-apps`, `POST` (encrypts via existing AES-GCM key),
+  `PATCH` (relabel/archive). No plaintext returned after create.
+- Page at `/admin/oauth-apps` — one card per platform, "+ add app",
+  reveal-only redirect URI.
+- Migrate every adapter to `getAppConfig(env, platform, account.platformAppId)`
+  with env fallback.
 - OAuth start picks the app: `?appId=` or auto-pick when only one exists
-- Migrate every adapter (Reddit / LinkedIn / Twitter / IG / PH) to read from
-  `getAppConfig(env, platform, account.platformAppId)` instead of `env.*`
+  for that platform.
 
-### Per-account daily token refresh cron
-Right now we refresh on use; long-idle channels expire silently.
-- New cron (`0 4 * * *`) iterates active accounts, refreshes any token whose
-  `expires_at` is within 48 h
-- Per-platform refresh strategies live in the existing adapter
-- Failed refresh → mark account `revoked_at` and audit-log it
+### 3. Per-account daily token refresh cron
+Belt-and-braces against the on-use refresh missing edge cases.
+- New cron `0 4 * * *` walks active accounts; refreshes any token whose
+  `expires_at` < 48h.
+- On refresh failure marks the account `revoked_at` and Telegram-pings
+  the owner.
 
-### Toasts replacing `alert()` / `confirm()`
-Half a dozen `alert()`s in the codebase look ugly on mobile and block other UI.
-- Add a tiny toast layer (sonner is the default; or a 30-line homegrown one)
-- Replace `alert(msg)` with `toast.error(msg)` everywhere
-- Replace `confirm(msg)` with a `<ConfirmDialog>` shadcn pattern
+### 4. Twitter media upload
+Adapter currently text-only (`twitter.ts` header explicitly says so).
+- v1.1 chunked upload: `INIT` / `APPEND` / `FINALIZE` against
+  `upload.twitter.com`.
+- New HMAC-SHA1 signing helper in `lib/crypto.ts` (existing file is
+  AES-only).
+- Wire `media[]` from drafts into the publish flow; attach
+  `media_ids` to v2 tweet create.
 
-## Soon
+### 5. Instagram publish flow
+Today `instagram.ts` `publish()` is a 501 stub.
+- R2 public-URL helper (or CF Access-bypassed signed URLs for
+  `/api/media/:id/raw`).
+- Container POST → status-poll → publish POST sequence.
+- Branch on `platformOptions.kind`: feed image / reel / carousel.
 
-### Auto-save drafts (debounced)
-Editor currently relies on explicit save. Lose-tab = lose-work.
-- 1.5 s debounce on body / title / platformOptions changes
-- Visible "saving…" / "saved 12s ago" indicator using `<DateTime>`
-- Conflict detection via `updatedAt` ETag (409 → reload + warn)
+### 6. LinkedIn save-as-draft
+Adapter has `pushDraft()` (lifecycleState=DRAFT). No route, no button.
+- `POST /api/drafts/:id/push-to-linkedin-draft` — calls adapter, stores
+  returned URN as `platformDraftId`.
+- Status flag or `meta` field on the draft so UI can show "drafted on
+  LinkedIn".
 
-### LinkedIn save-as-draft
-LinkedIn's API supports posts in `DRAFT` lifecycle; we publish straight to
-`PUBLISHED` today. A "save as LinkedIn draft" button lets the user finalise
-inside LinkedIn before pressing publish there.
-- New action button in `DraftEditor` for LinkedIn drafts
-- New status `linkedin_drafted` (or reuse `published` with a meta flag —
-  decide before implementing)
+### 7. Per-account publish serialisation
+Two queue jobs targeting the same channel can fire in parallel and
+trip platform rate limits. Take a per-account lock in the queue
+consumer.
+- Use D1 conditional update on `accounts.publishing_until` (new column,
+  stamps `now + 60s` if null/past). Job retries with backoff if locked.
 
-### Twitter media upload (OAuth1.0a)
-Twitter v2 still requires v1.1 chunked upload for media; our adapter today
-only handles text threads.
-- Implement `INIT` / `APPEND` / `FINALIZE` against `upload.twitter.com`
-- HMAC-SHA1 signing helper (existing `crypto.ts` is AES-only — add lib)
-- Wire `media[]` from drafts into the publish flow
+## Soon — depth-of-publish + automation
 
-### Instagram publish via R2 signed URLs
-IG Graph API needs a public URL, not a Blob. R2 doesn't sign by default.
-- Public R2 bucket *or* CF Access-bypassed signed URLs for `/api/media/:id/raw`
-- Container POST → status poll → publish POST sequence in adapter
-- Reels vs Image vs Carousel branch in `platformOptions`
+### 8. Failed-publish retry endpoint + UI
+Backoff exists but on exhaustion the only recovery is `/retry <id>`
+in Telegram.
+- `POST /api/publishes/:id/retry` — re-enqueues if status=`failed`.
+- "Failed" filter chip on draft list and a one-click retry button.
 
-## Later
+### 9. Audit-log writer middleware
+`audit_log` table exists, nothing writes to it (except a single
+`scheduler.tick` row), nothing reads. Without this, multi-user
+collab is opaque.
+- Hono middleware on every mutating route: capture
+  `actorId / projectId / action / targetType / targetId / payload`.
+- `GET /api/projects/:id/audit?since=` for read.
 
-### Loading skeletons everywhere
-Current loading state is `loading…` text. Shadcn-style skeleton cards on:
-home, project dashboard, channels list, draft list, calendar.
+### 10. Draft duplication
+`POST /api/drafts/:id/duplicate` — copies body, platformOptions,
+media attachments; sets `status=draft`, `scheduledFor=null`,
+`sequenceInTrack` = existing max + 1.
 
-### Per-platform validation hints in editor
-Reddit char limits, IG hashtag count, Twitter thread tweet length per node.
-Show a soft warning chip below the body field.
+### 11. Search / filter on drafts
+Endpoint already supports `status` + `trackId`; add `q` (LIKE on
+title/body, SQLite `LIKE` is fine at our scale) and a project-scoped
+filter UI on the drafts list.
 
-### Audit-log writer middleware
-`audit_log` table exists but nothing writes to it. Hono middleware that
-captures actor + projectId + action for every mutating route.
+### 12. Auto-save drafts
+Debounced PATCH every 1.5s while editing; conflict via `updatedAt`
+ETag (409 → reload + warn).
 
-### Analytics phase 3
-- Per-platform reach / engagement pull (where API allows)
-- Stored as time-series in a new `metrics` table
-- Sparklines on the project dashboard
+### 13. Per-platform validation hints in editor
+Soft-warning chips below the body field:
+- Reddit: 40 000 char self-post / 300 char title.
+- Instagram: ≤ 30 hashtags, 2 200 char caption.
+- Twitter: 280 chars per tweet (per node when threading).
+- LinkedIn: 3 000 char post.
 
-### Search drafts by title / body
-Full-text on a small dataset is fine via SQLite `LIKE`; revisit if it grows.
+### 14. Reorder media in carousel
+`dnd-kit`, persists `position` on `draft_media` rows.
 
-### Draft duplication
-`POST /api/drafts/:id/duplicate` — common when reposting a winner.
+### 15. Recurring tracks
+`tracks.recurrence` column (`weekly | monthly | null`); cron clones
+the next occurrence's drafts at the boundary (offset minutes carried).
 
-### Reorder media in carousel
-Drag-to-reorder using `dnd-kit` (avoid bringing in the full `react-beautiful-dnd`).
+### 16. Cross-project calendar
+Today `/p/:slug/calendar` is per-project. Add `/calendar` (no slug)
+that aggregates scheduled drafts across every project the user
+sees.
 
-### Project owner-based visibility (option B)
-Today projects are visible via `project_members`. Extend to also resolve via
-project owner-emails so adding a teammate by email doesn't require a separate
-membership row.
+## Later — analytics, inbound, AI
 
-## Backlog (sketches only — revisit before starting)
+### 17. Analytics phase 3
+- Daily cron pulls reach / engagement per platform where API allows.
+- New `metrics` table (time-series).
+- Sparkline + best-time-to-post hint on project dashboard.
 
-- Mobile-only quick-compose entry on home (1 tap → editor pre-filled)
-- Recurring tracks ("weekly recap on Friday 5pm")
-- Comment / reply ingest (read-only) per platform
-- Multi-actor publish: pick which channel-owner's token to publish with when
-  multiple owners exist
-- Slack notifications mirroring the Telegram bot
-- AI-assisted rewrite per platform (Reddit voice / LinkedIn voice / etc.)
-- Bulk import drafts from a markdown file or Notion export
+### 18. Comment / reply ingest (read-only)
+Reddit + Twitter first; surface as a "replies" tab on draft detail.
+No interactive replies — just visibility.
+
+### 19. AI rewrite per platform
+Wire to an LLM endpoint with the `mcp.md` behavioural rules baked in.
+"Rewrite for Reddit voice", "tighten this for Twitter thread".
+
+### 20. Bulk import drafts
+From a markdown directory or Notion export. Each `.md` becomes a
+draft; YAML front-matter maps to track + scheduledFor + platform
+options.
+
+### 21. Multi-actor publish
+When a channel has multiple owners, pick which owner's token to
+publish with at schedule time (some platforms key rate-limits per
+authenticated user).
+
+## UX polish — after functional work
+
+### 22. Toasts
+Replace every `alert()` / `confirm()` with a toast layer + a
+shadcn-style `<ConfirmDialog>`.
+
+### 23. Loading skeletons
+Home / project dashboard / channels / draft list / calendar.
+
+### 24. Mobile quick-compose
+Tap an FAB on home → editor pre-filled with default project + last-used
+track.
+
+### 25. Slack notifications
+Mirror the Telegram bot's notify events.
+
+### 26. New platform integrations
+Threads, Mastodon, Bluesky, TikTok. Each ~1 day.
+
+### 27. In-browser image editing
+Crop / brightness / aspect-ratio before upload.
+
+## Backlog — revisit before starting
+
+- **Project owner-based visibility (option B)** — resolve project
+  visibility through `owners + owner_emails` so adding a teammate by
+  email doesn't require a separate `project_members` row. Today the
+  two ACLs (project membership for project visibility, owner-email for
+  channel visibility) feel duplicative when a "founders" owner already
+  exists.
+- **Per-user notification preferences** — which events route to
+  Telegram (publish.success vs only publish.failed; daily vs none).
+- **Collab surface — full** (draft-lock with revision number, in-app
+  `@-mentions`, review queue with approve/reject). Defer until the
+  team is > 5.
+- **Operator/admin dashboard** — list all users / sessions / failed
+  publishes / token health / API keys account-wide. Useful but not
+  blocking until we have multiple operators.
+- **Open-sourcing the schema** — release the `plan/` original docs
+  separately for anyone forking the deploy template.

@@ -52,11 +52,19 @@ Conventions:
 ## Phase 1 — drafts (mostly done)
 
 ### Auth + users
-- [x] CF Access JWT verifier in `requireUser`
-- [x] User row auto-upserted on first login
+- [x] CF Access JWT verifier in `requireUser` (kept; `AUTH_MODE=cf_access` switch)
+- [x] **Passkey / WebAuthn login** as the live mode (`AUTH_MODE=webauthn`)
+- [x] Email-OTP bootstrap via Resend on a verified domain
+- [x] Signed-cookie session (HMAC-SHA256, 7-day TTL)
+- [x] `/login` page (passkey + email-OTP) and `/api/auth/*` route surface
+- [x] Static allowlist via `WEBAUTHN_ALLOWED_EMAILS` (3 emails today)
+- [x] Bearer-API-key auth path on `requireUser` (sets `viaApiKey` flag)
+- [x] User row auto-upserted on first login (passkey OTP path)
 - [x] Dev-mode bypass via `Cf-Access-Jwt-Assertion: dev` + `X-Dev-Email`
+- [x] **Session→user KV cache (60s TTL)** on the cookie path — saves a D1 SELECT per authed request
 - [ ] First-login UX: prompt for display name (OTP gives no `name`)
-- [ ] Sign-out helper
+- [ ] Sign-out helper (button + `POST /api/auth/logout`)
+- [ ] Per-device passkey label prompt at registration
 
 ### Projects
 - [x] `POST /api/projects` (creator becomes owner)
@@ -163,6 +171,29 @@ Conventions:
 - [ ] Toast notifications (replacing `confirm()` / `alert()`)
 - [ ] Loading skeletons
 
+### Programmatic / MCP API
+- [x] `api_keys` table — sha256-hashed at rest; plaintext shown once on create
+- [x] `lib/api-keys.ts` — generate / hash / constant-time compare
+- [x] `routes/api-keys.ts` — list / create / revoke (creating a key needs a passkey session)
+- [x] `requireUser` accepts `Authorization: Bearer smm_<hex>` (Bearer wins so scope guard applies)
+- [x] **Scope guard**: API-key auth permits only `GET / POST / PATCH` on `/api/projects`, `/api/tracks`, `/api/drafts`. Everything else → 403. DELETE blocked.
+- [x] Home "api keys" card (list / `+ new key` with one-shot reveal + copy chip / revoke)
+- [x] `mcp.md` — paste-into-LLM context document (auth header, base URL, schemas, behavioural rules)
+- [x] **`/mcp` in-app page** — renders `mcp.md` (static asset, no auth) with "copy all" button. Build script copies `mcp.md` → `web/public/mcp.md`.
+
+### Performance
+- [x] **Session→user KV cache** (60s TTL) — first hit grabs from cache, skips D1 SELECT and HMAC verify
+- [x] Raw D1 prepared statements on hot read paths: `requireRole`, `GET /api/projects`, `/api/projects/:slug`, `/api/tracks`, `/api/tracks/:id`, `/api/drafts`, `/api/drafts/:id`. Dropped Drizzle's query-builder overhead on the boring reads.
+- [x] JOIN-fused role check on per-resource gets (`/api/projects/:slug` etc.) — one D1 round-trip instead of two.
+- [x] **p99 14.05 ms → 7.43 ms (-47%)** measured against the 15 min after deploy. p50 2.16 → 0.53 ms.
+
+### Observability + repo hygiene
+- [x] `[observability.logs] enabled = true, invocation_logs = true` on the Worker (no more `wrangler tail` dependency)
+- [x] **Public-template scrub** — `api/wrangler.toml` ships with empty resource ids and `example.com` placeholders; live values live in gitignored `api/wrangler.local.toml`
+- [x] `what_i_need.md`, `DEPLOY_STATE.md`, `api/wrangler.local.toml` all gitignored — only their `.example` siblings committed
+- [x] Hostname / personal-email scrub across docs and seed scripts; verified via `git ls-files | xargs grep`
+- [x] `web/wrangler.toml` + the `wrangler` devDep dropped from web (Pages project removed)
+
 ### Audit log
 - [ ] Audit-log writer middleware
 - [ ] `GET /api/projects/:id/audit`
@@ -229,6 +260,8 @@ Conventions:
 - `0005_spicy_sprite` — reminders table
 - `0006_lazy_the_executioner` — `accounts.project_id` and `owners.project_id` nullable
 - `0007_worthless_black_queen` — `platform_apps` table + `accounts.platform_app_id`
+- `0008_passkeys` — `user_credentials` (WebAuthn devices) + `auth_challenges` (login/register/email-OTP)
+- `0009_api_keys` — programmatic access keys (sha256-hashed at rest)
 
 ---
 
@@ -258,11 +291,12 @@ Conventions:
 
 ## Future / nice-to-have (unprioritised)
 
-- [ ] passkey login
+- [x] **passkey login** (live as `AUTH_MODE=webauthn`)
+- [x] **Open-source the repo** (`phoenix911/social_media_manager`, MIT, Deploy-to-CF button)
 - [ ] Per-user notification preferences
 - [ ] Threads / Mastodon / Bluesky / TikTok integrations
 - [ ] In-browser image editing (crop, annotate)
-- [ ] Open-source the repo
+- [ ] Operator dashboard (failed publishes / sessions / api keys account-wide)
 
 ---
 
