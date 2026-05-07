@@ -1,0 +1,1 @@
+ALTER TABLE `drafts` ADD `sequence_in_track` real;

@@ -1,0 +1,31 @@
+{
+  "name": "@smm/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "tail": "wrangler tail",
+    "db:generate": "drizzle-kit generate",
+    "db:apply:local": "wrangler d1 migrations apply smm --local",
+    "db:apply:remote": "wrangler d1 migrations apply smm --remote",
+    "secret:put-token-key": "openssl rand -hex 32 | wrangler secret put SMM_TOKEN_KEY"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^11.0.0",
+    "@smm/shared": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.12",
+    "jose": "^5.9.6",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "drizzle-kit": "^0.28.1",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.95.0"
+  }
+}

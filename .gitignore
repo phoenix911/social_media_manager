@@ -1,0 +1,30 @@
+node_modules/
+.wrangler/
+dist/
+build/
+.dev.vars
+.dev.vars.*
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# secrets — only the .example variant is committed
+what_i_need.md
+DEPLOY_STATE.md
+
+# local wrangler override carrying real account_id / resource ids
+api/wrangler.local.toml
+.cache/
+coverage/
+.vscode/
+.idea/
+
+# Drizzle
+drizzle/meta/_journal.json.bak
+
+# Local sqlite (drizzle-kit local)
+*.db
+*.db-shm
+*.db-wal

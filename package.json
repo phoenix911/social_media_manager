@@ -1,0 +1,23 @@
+{
+  "name": "smm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["api", "web", "shared"],
+  "scripts": {
+    "dev:api": "bun --filter ./api dev",
+    "dev:web": "bun --filter ./web dev",
+    "build:web": "bun --filter ./web build",
+    "build:api": "bun --filter ./api build",
+    "typecheck": "bun --filter '*' typecheck",
+    "deploy:api": "bun --filter ./api deploy",
+    "deploy:web": "bun --filter ./web deploy",
+    "db:generate": "bun --filter ./api db:generate",
+    "db:apply:local": "bun --filter ./api db:apply:local",
+    "db:apply:remote": "bun --filter ./api db:apply:remote"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "bun@1.1.34"
+}

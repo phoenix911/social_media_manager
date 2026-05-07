@@ -1,0 +1,137 @@
+name = "smm-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# When the user clicks "Deploy to Cloudflare" the deploy flow creates a
+# fresh account binding for them. For local `wrangler` against the
+# original account, set CLOUDFLARE_ACCOUNT_ID in your shell or a
+# .dev.vars file (gitignored). Hardcoded account_id removed for the
+# public repo.
+# account_id = ""
+
+routes = [
+  # The deploy form prompts for the production hostname; this default
+  # works only if you bind the included custom domain. Override.
+  { pattern = "smm.example.com", custom_domain = true },
+]
+
+# Serve the built web app from this same Worker. /api/* is handled by
+# our routes; everything else falls through to the static asset
+# handler with SPA-style index.html fallback.
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "smm"
+# database_id is filled by the deploy flow when the D1 is created.
+database_id = ""
+migrations_dir = "drizzle/migrations"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "smm-media"
+
+[[kv_namespaces]]
+binding = "KV"
+# id is filled by the deploy flow when the KV namespace is created.
+id = ""
+
+[[queues.producers]]
+queue = "smm-publish"
+binding = "PUBLISH_QUEUE"
+
+[[queues.consumers]]
+queue = "smm-publish"
+max_batch_size = 10
+max_retries = 3
+max_batch_timeout = 30
+
+[triggers]
+# * * * * *   — publish scheduler (every minute, picks up due drafts)
+# 30 3 * * *  — daily reminders at 9am IST (UTC+5:30 → 03:30 UTC)
+crons = ["* * * * *", "30 3 * * *"]
+
+# ────────────────────────────────────────────────────────────────────
+# [vars] — these become editable input fields in the
+# "Deploy to Cloudflare" form. Defaults below are placeholders; the
+# user is expected to override each one for their own deploy.
+# ────────────────────────────────────────────────────────────────────
+[vars]
+ENVIRONMENT = "production"
+
+# Hostname the Worker is served on. The web app uses this to build
+# OAuth redirect URIs ("https://${APP_HOSTNAME}/oauth/<platform>/callback").
+APP_HOSTNAME = "smm.example.com"
+
+# Same hostname — kept for backward-compat (the same Worker serves
+# both SPA and API).
+API_HOSTNAME = "smm.example.com"
+
+# IANA tz used as fallback for tracks/drafts that don't carry one.
+DEFAULT_TZ = "Asia/Kolkata"
+
+# Cloudflare Access team subdomain (without ".cloudflareaccess.com").
+# Required only when AUTH_MODE = "cf_access".
+CF_ACCESS_TEAM = ""
+
+# AUD of the Access app gating this Worker's hostname. Filled after
+# the Access app is created. Required when AUTH_MODE = "cf_access".
+CF_ACCESS_AUD_API = ""
+
+# Auth backend selector. Two options:
+#   "cf_access" — every request must carry a Cf-Access-Jwt-Assertion
+#                 header validated against CF_ACCESS_AUD_API.
+#   "webauthn"  — passkey login flow served at /login (see below).
+AUTH_MODE = "webauthn"
+
+# Email allowlist for self-service signup when AUTH_MODE = "webauthn".
+# Comma-separated list of emails or "*" to allow anyone with a magic-
+# link (still gated by email OTP for the first device).
+WEBAUTHN_ALLOWED_EMAILS = "*"
+
+# Cookie name + max-age for the WebAuthn session cookie.
+SESSION_COOKIE_NAME = "smm_sess"
+SESSION_TTL_SECONDS = "604800"   # 7 days
+
+# Telegram bot path secret (URL-embedded). The bot's webhook is
+# POST /api/telegram/${TELEGRAM_WEBHOOK_PATH}. Leave empty to disable
+# the bot entirely.
+TELEGRAM_WEBHOOK_PATH = ""
+
+# Comma-separated list of allowed Telegram chat ids OR @usernames.
+# Empty = bot accepts no one (safe default).
+TELEGRAM_ALLOWED_CHAT_IDS = ""
+
+# ────────────────────────────────────────────────────────────────────
+# Secrets (set via `wrangler secret put` after first deploy, or in the
+# Cloudflare dashboard → Workers → Settings → Variables → Encrypt).
+# These do NOT belong in [vars]; they are listed here so the deploy
+# form can prompt for them.
+#
+#   SMM_TOKEN_KEY                  256-bit base64 AES-GCM key for token
+#                                  encryption. Generate with:
+#                                  `openssl rand -base64 32`
+#   SESSION_SIGNING_KEY             32-byte base64 HMAC key for the
+#                                  WebAuthn session cookie.
+#                                  `openssl rand -base64 32`
+#
+#   Per-platform OAuth (only what you actually use):
+#   REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET / REDDIT_USER_AGENT
+#   LINKEDIN_CLIENT_ID / LINKEDIN_CLIENT_SECRET
+#   TWITTER_OAUTH2_CLIENT_ID / TWITTER_OAUTH2_CLIENT_SECRET
+#   TWITTER_OAUTH1_CONSUMER_KEY / TWITTER_OAUTH1_CONSUMER_SECRET
+#   META_APP_ID / META_APP_SECRET
+#   PRODUCTHUNT_CLIENT_ID / PRODUCTHUNT_CLIENT_SECRET
+#
+#   Telegram:
+#   TELEGRAM_BOT_TOKEN
+#
+#   Email OTP (passkey first-device bootstrap):
+#   RESEND_API_KEY                 from resend.com (or substitute another)
+#   EMAIL_FROM                     "Sender Name <noreply@smm.example.com>"
+# ────────────────────────────────────────────────────────────────────

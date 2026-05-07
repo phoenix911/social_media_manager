@@ -1,0 +1,80 @@
+# Once these are filled I'll fetch / generate everything else
+# discoverable via wrangler / openssl (zone id after the domain is
+# added to CF, AUD tags after the CF Access app is created, master
+# encryption key, D1/R2/KV bindings). gcloud not needed — auth is
+# CF Access One-time PIN, no Google IDP.
+
+# --- cloudflare ------------------------------------------------------
+# Create token at: dash.cloudflare.com -> My Profile -> API Tokens ->
+# Create Token -> Custom token. Scope it to THIS account only:
+# Account perms: Workers Scripts:Edit, Workers KV Storage:Edit,
+#   D1:Edit, R2:Edit, Queues:Edit, Pages:Edit,
+#   Cloudflare Access:Edit, Account Settings:Read
+# Zone perms (after adding the domain): Zone:Read, DNS:Edit,
+#   Workers Routes:Edit
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_API_TOKEN=
+
+# --- domain ----------------------------------------------------------
+APP_HOSTNAME=smm.example.com
+API_HOSTNAME=api.smm.example.com
+CLOUDFLARE_ZONE_ID=
+DEFAULT_TZ=Asia/Kolkata
+
+# --- infra naming ----------------------------------------------------
+WORKER_NAME_API=smm-api
+PAGES_PROJECT_NAME=smm-web
+D1_DATABASE_NAME=smm
+KV_NAMESPACE_TITLE=smm-kv
+R2_BUCKET_NAME=smm-media
+QUEUE_NAME=smm-publish
+
+# --- cloudflare zero trust ------------------------------------------
+# Find at: dash -> Zero Trust -> Settings -> Custom Pages. The team
+# domain reads as <team>.cloudflareaccess.com -- paste just the <team>
+# bit here (lowercase, alphanumeric + hyphens).
+CF_ACCESS_TEAM=
+
+# Access Application AUD tag for api.smm.<domain> -- populated AFTER
+# the Access app is created via API. Leave blank for now.
+CF_ACCESS_AUD_API=
+
+# --- access allowlist ------------------------------------------------
+APP_ALLOWED_EMAILS=you@example.com
+
+# --- reddit (reddit.com/prefs/apps) ---------------------------------
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+REDDIT_USERNAME_FOR_UA=
+
+# --- linkedin (developer.linkedin.com) -------------------------------
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+
+# --- twitter / x (developer.twitter.com) -----------------------------
+TWITTER_OAUTH2_CLIENT_ID=
+TWITTER_OAUTH2_CLIENT_SECRET=
+TWITTER_OAUTH1_CONSUMER_KEY=
+TWITTER_OAUTH1_CONSUMER_SECRET=
+
+# --- meta / instagram (developers.facebook.com) ---------------------
+META_APP_ID=
+META_APP_SECRET=
+
+# --- product hunt (api.producthunt.com/v2/oauth/applications) -------
+PRODUCTHUNT_CLIENT_ID=
+PRODUCTHUNT_CLIENT_SECRET=
+
+# --- telegram bot (BotFather) ---------------------------------------
+# Bot acts as both notifier and interaction channel: pings on
+# schedule/publish events; responds to /today, /scheduled, /cancel,
+# /retry inline-button commands.
+TELEGRAM_BOT_TOKEN=
+# Mix of numeric chat ids (immutable) and @usernames (mutable but
+# easier). Comma-separated. Empty = deny everyone.
+TELEGRAM_ALLOWED_CHAT_IDS=
+
+# --- token encryption (generate once) -------------------------------
+# 32 random bytes, base64-encoded. Use:  openssl rand -base64 32
+# Used for AES-GCM encryption of OAuth tokens at rest in D1.
+SMM_TOKEN_KEY=

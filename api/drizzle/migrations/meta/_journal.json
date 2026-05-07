@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1778161663888,
+      "tag": "0000_legal_human_torch",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778174241109,
+      "tag": "0001_milky_spot",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778175902757,
+      "tag": "0002_quick_raza",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1778176343423,
+      "tag": "0003_long_doctor_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1778176980585,
+      "tag": "0004_organic_strong_guy",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778181682372,
+      "tag": "0005_spicy_sprite",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1778182798572,
+      "tag": "0006_lazy_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1778183960898,
+      "tag": "0007_worthless_black_queen",
+      "breakpoints": true
+    }
+  ]
+}

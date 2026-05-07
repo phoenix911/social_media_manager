@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="11" fill="#FAF7EE"/>
+  <!-- Notebook page -->
+  <rect x="8" y="13" width="48" height="44" rx="2" fill="#FCFAF4" stroke="#1B2024" stroke-width="1.6"/>
+  <!-- Red margin -->
+  <line x1="16" y1="15" x2="16" y2="55" stroke="#B73E2A" stroke-width="1" opacity="0.6"/>
+  <!-- Spiral holes -->
+  <g fill="#1B2024">
+    <ellipse cx="14" cy="13.6" rx="1.4" ry="1"/>
+    <ellipse cx="22" cy="13.6" rx="1.4" ry="1"/>
+    <ellipse cx="30" cy="13.6" rx="1.4" ry="1"/>
+    <ellipse cx="38" cy="13.6" rx="1.4" ry="1"/>
+    <ellipse cx="46" cy="13.6" rx="1.4" ry="1"/>
+    <ellipse cx="54" cy="13.6" rx="1.4" ry="1"/>
+  </g>
+  <!-- Spiral rings (top arcs) -->
+  <g fill="none" stroke="#5B5C5E" stroke-width="1.4" stroke-linecap="round">
+    <path d="M 11 8 q 3 -5 6 0"/>
+    <path d="M 19 8 q 3 -5 6 0"/>
+    <path d="M 27 8 q 3 -5 6 0"/>
+    <path d="M 35 8 q 3 -5 6 0"/>
+    <path d="M 43 8 q 3 -5 6 0"/>
+    <path d="M 51 8 q 3 -5 6 0"/>
+  </g>
+  <!-- Title strokes (abstract handwriting) -->
+  <g stroke="#1B2024" stroke-width="2.4" stroke-linecap="round">
+    <line x1="22" y1="28" x2="48" y2="28"/>
+    <line x1="22" y1="36" x2="44" y2="36"/>
+    <line x1="22" y1="44" x2="38" y2="44"/>
+  </g>
+  <!-- TTT corner mark -->
+  <g stroke="#1B2024" stroke-width="0.8" fill="none">
+    <line x1="46" y1="48" x2="46" y2="54"/>
+    <line x1="50" y1="48" x2="50" y2="54"/>
+    <line x1="44" y1="50" x2="52" y2="50"/>
+    <line x1="44" y1="52" x2="52" y2="52"/>
+  </g>
+</svg>

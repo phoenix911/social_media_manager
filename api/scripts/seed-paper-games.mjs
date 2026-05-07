@@ -1,0 +1,179 @@
+// Generate seed.sql for the paper-games project from the markdown
+// distribution plan in ../paper_games/app_distribution/reddit/*.md.
+//
+// Usage:  bun api/scripts/seed-paper-games.mjs > api/scripts/seed.sql
+// Apply:  wrangler d1 execute smm --remote --file=api/scripts/seed.sql
+//
+// Idempotent: uses INSERT OR IGNORE on users + projects, INSERT OR
+// REPLACE on the membership row, and only inserts a draft if no
+// row with the same (project_id, title) already exists.
+
+import { readdirSync, readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const REDDIT_DIR = join(here, "../../../paper_games/app_distribution/reddit");
+
+const SEED_EMAIL = "sangeet.verma91@gmail.com";
+const SEED_PROJECT_SLUG = "paper-games";
+const SEED_PROJECT_NAME = "Paper Games";
+const SEED_PROJECT_DESC =
+  "Pen-and-paper games for iOS + Android. Free, no ads, no analytics.";
+
+// ── parse frontmatter + body sections ────────────────────────────────
+const parseFile = (text) => {
+  const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!fmMatch) return null;
+  const fm = Object.fromEntries(
+    fmMatch[1]
+      .split("\n")
+      .filter((l) => l.includes(":"))
+      .map((l) => {
+        const i = l.indexOf(":");
+        return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
+      }),
+  );
+  const body = fmMatch[2];
+
+  // Find a "## Title" section — pick first list item / option.
+  const title = pickFirstTitle(body);
+  // Find a "## Body" or "## Comment body draft" section — extract its blockquote / paragraphs.
+  const post = pickPostBody(body);
+
+  return { fm, title, post };
+};
+
+// Section extractor: grab everything between a `## Heading` and the
+// next `##` or end of string. No /m flag — `$` means end of string.
+const section = (body, headingRegex) => {
+  const m = body.match(new RegExp(`\\n##\\s+${headingRegex}[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`));
+  return m ? m[1].trim() : null;
+};
+
+const pickFirstTitle = (body) => {
+  const sec = section(body, "Title");
+  if (!sec) return null;
+  const line = sec.split("\n").find((l) => /^\s*-\s+/.test(l));
+  return line ? line.replace(/^\s*-\s+/, "").trim() : null;
+};
+
+const pickPostBody = (body) => {
+  const sec =
+    section(body, "Body draft") ||
+    section(body, "Body") ||
+    section(body, "Comment body");
+  return sec ? cleanBlockquote(sec) : null;
+};
+
+// Strip leading "> " markers from blockquoted bodies.
+const cleanBlockquote = (s) =>
+  s
+    .split("\n")
+    .map((l) => l.replace(/^>\s?/, ""))
+    .join("\n")
+    .trim();
+
+// ── UUIDv7 (matches api/src/lib/ids.ts) ──────────────────────────────
+const uuidv7 = () => {
+  const ms = Date.now();
+  const rnd = new Uint8Array(10);
+  crypto.getRandomValues(rnd);
+  const bytes = new Uint8Array(16);
+  bytes[0] = (ms / 2 ** 40) & 0xff;
+  bytes[1] = (ms / 2 ** 32) & 0xff;
+  bytes[2] = (ms / 2 ** 24) & 0xff;
+  bytes[3] = (ms / 2 ** 16) & 0xff;
+  bytes[4] = (ms / 2 ** 8) & 0xff;
+  bytes[5] = ms & 0xff;
+  for (let i = 0; i < 10; i++) bytes[6 + i] = rnd[i];
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
+// ── SQL helpers ──────────────────────────────────────────────────────
+const sqlStr = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+
+// ── main ─────────────────────────────────────────────────────────────
+const files = readdirSync(REDDIT_DIR)
+  .filter((f) => f.endsWith(".md"))
+  .filter((f) => f !== "plan.md" && f !== "README.md")
+  .sort();
+
+const drafts = [];
+for (const f of files) {
+  const text = readFileSync(join(REDDIT_DIR, f), "utf8");
+  const parsed = parseFile(text);
+  if (!parsed) {
+    console.error(`# skipped ${f} — no frontmatter`);
+    continue;
+  }
+  const { fm, title, post } = parsed;
+  const subreddit = (fm.subreddit || "").replace(/^r\//, "");
+  const referrerSlug = fm.referrer_slug || "";
+  const sequence = parseInt(fm.sequence || "0", 10);
+  // If the file uses a "Comment body" section, treat as a thread-comment post.
+  const isComment = /\n##\s+Comment body/i.test(text);
+
+  drafts.push({
+    sequence,
+    subreddit,
+    referrerSlug,
+    priority: fm.priority || "",
+    title: title || (isComment ? `r/${subreddit} — weekly thread comment` : `r/${subreddit} post`),
+    body: post || "",
+    postKind: isComment ? "comment" : "self",
+  });
+}
+drafts.sort((a, b) => a.sequence - b.sequence);
+
+// emit SQL — pre-generate UUIDs so the script is referentially complete.
+const userId = uuidv7();
+const projectId = uuidv7();
+
+const lines = [];
+lines.push("-- Seed: paper-games project + reddit draft set");
+lines.push("-- Generated by api/scripts/seed-paper-games.mjs");
+lines.push("");
+lines.push("-- 1. user (idempotent: skip if email exists)");
+lines.push(
+  `INSERT OR IGNORE INTO users (id, email) VALUES (${sqlStr(userId)}, ${sqlStr(SEED_EMAIL)});`,
+);
+lines.push("");
+lines.push("-- 2. project (idempotent: skip if slug exists)");
+lines.push(
+  `INSERT OR IGNORE INTO projects (id, slug, name, description, owner_id) ` +
+    `SELECT ${sqlStr(projectId)}, ${sqlStr(SEED_PROJECT_SLUG)}, ${sqlStr(SEED_PROJECT_NAME)}, ${sqlStr(SEED_PROJECT_DESC)}, id ` +
+    `FROM users WHERE email = ${sqlStr(SEED_EMAIL)};`,
+);
+lines.push("");
+lines.push("-- 3. owner membership");
+lines.push(
+  `INSERT OR REPLACE INTO project_members (project_id, user_id, role) ` +
+    `SELECT p.id, u.id, 'owner' FROM projects p JOIN users u ON u.email = ${sqlStr(SEED_EMAIL)} ` +
+    `WHERE p.slug = ${sqlStr(SEED_PROJECT_SLUG)};`,
+);
+lines.push("");
+lines.push("-- 4. drafts (one per subreddit, idempotent on title)");
+for (const d of drafts) {
+  const platformOpts = JSON.stringify({
+    subreddit: d.subreddit,
+    postKind: d.postKind,
+    seedReferrerSlug: d.referrerSlug,
+    seedPriority: d.priority,
+    seedSequence: d.sequence,
+  });
+  const draftId = uuidv7();
+  lines.push(
+    `INSERT INTO drafts (id, project_id, account_id, status, title, body, body_format, platform_options, created_by) ` +
+      `SELECT ${sqlStr(draftId)}, p.id, NULL, 'draft', ${sqlStr(d.title)}, ${sqlStr(d.body)}, 'markdown', ${sqlStr(platformOpts)}, u.id ` +
+      `FROM projects p JOIN users u ON u.email = ${sqlStr(SEED_EMAIL)} ` +
+      `WHERE p.slug = ${sqlStr(SEED_PROJECT_SLUG)} ` +
+      `  AND NOT EXISTS (SELECT 1 FROM drafts d WHERE d.project_id = p.id AND d.title = ${sqlStr(d.title)});`,
+  );
+}
+lines.push("");
+
+console.log(lines.join("\n"));
