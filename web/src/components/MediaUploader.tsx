@@ -50,14 +50,19 @@ export const MediaUploader = ({ draftId, projectId }: { draftId: string; project
             }),
           },
         );
-        // Stream the binary. Send as ArrayBuffer (not Blob) to dodge
-        // browser/SW quirks that surface as "load failed" on PUT.
-        const buf = await file.arrayBuffer();
+        // Stream the file directly. Sending the File (a Blob subclass)
+        // lets the browser stream from disk; materialising via
+        // file.arrayBuffer() first triggers iOS WebKit's RAM cap on
+        // PWA fetch bodies and the request silently never goes out.
+        // Cache-bust to rule out any stale SW route still alive in an
+        // installed PWA shell.
+        const bustedUrl = `${uploadUrl}${uploadUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
         let put: Response;
         try {
-          put = await fetch(uploadUrl, {
+          put = await fetch(bustedUrl, {
             method: "PUT",
             credentials: "include",
+            cache: "no-store",
             headers: {
               "Content-Type": file.type || "application/octet-stream",
               ...(import.meta.env.DEV
@@ -67,7 +72,7 @@ export const MediaUploader = ({ draftId, projectId }: { draftId: string; project
                   }
                 : {}),
             },
-            body: buf,
+            body: file,
           });
         } catch (e) {
           throw new Error(`upload network error: ${(e as Error).message}`);
