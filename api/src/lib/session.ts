@@ -38,7 +38,7 @@ export const verifySession = async (
 ): Promise<{ userId: string } | null> => {
   const parts = cookie.split(".");
   if (parts.length !== 3) return null;
-  const [userId, expStr, sig] = parts;
+  const [userId, expStr, sig] = parts as [string, string, string];
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp * 1000 < Date.now()) return null;
   const key = await importKey(requireKey(env));
