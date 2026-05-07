@@ -10,6 +10,7 @@ If you're an LLM (or a human) opening this repo cold, read in this order:
 6. [glossary.md](glossary.md) — domain terms (Worker, Access AUD, OTP, "platform", "publisher", etc.).
 7. [now.md](now.md) — exact state right now: what's deployed, what's working, what's next.
 8. [onboarding.md](onboarding.md) — adding a new user (passkey allowlist flow).
+9. [tracks.md](tracks.md) — adding tracks + drafts from the CLI (SQL or HTTP).
 
 After those, dig into:
 - `../plan/` for the original design docs (longer; fewer changes since written).
