@@ -30,36 +30,92 @@ const rowToDraft = (r: typeof schema.drafts.$inferSelect): Draft => ({
   archivedAt: r.archivedAt,
 });
 
-// GET /api/drafts?projectId=&status=&trackId=
+interface DraftRow {
+  id: string; project_id: string; track_id: string; account_id: string | null;
+  status: string; title: string | null; body: string;
+  platform_options: string | null; platform_draft_id: string | null;
+  track_offset_minutes: number | null; sequence_in_track: number | null;
+  scheduled_for: string | null; scheduled_tz: string | null;
+  created_by: string; created_at: string; updated_at: string; archived_at: string | null;
+}
+const rawToDraft = (r: DraftRow): Draft => ({
+  id: r.id,
+  projectId: r.project_id,
+  trackId: r.track_id,
+  accountId: r.account_id,
+  status: r.status as Draft["status"],
+  title: r.title,
+  body: r.body,
+  bodyFormat: "markdown",
+  platformOptions: r.platform_options ? JSON.parse(r.platform_options) : null,
+  platformDraftId: r.platform_draft_id,
+  trackOffsetMinutes: r.track_offset_minutes,
+  sequenceInTrack: r.sequence_in_track,
+  scheduledFor: r.scheduled_for,
+  scheduledTz: r.scheduled_tz,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  archivedAt: r.archived_at,
+});
+
+// GET /api/drafts?projectId=&status=&trackId= — JOIN role-check in.
 app.get("/", async (c) => {
   const projectId = idSchema.safeParse(c.req.query("projectId"));
   if (!projectId.success) throw BadRequest("projectId required");
-  await requireRole(c.env.DB, projectId.data, c.var.user.id, "viewer");
-
   const status = c.req.query("status");
   const trackId = c.req.query("trackId");
-  const d = db(c.env.DB);
-  const filters = [eq(schema.drafts.projectId, projectId.data)];
-  if (status) filters.push(eq(schema.drafts.status, status));
-  if (trackId) filters.push(eq(schema.drafts.trackId, trackId));
-  const rows = await d
-    .select()
-    .from(schema.drafts)
-    .where(and(...filters))
-    .orderBy(desc(schema.drafts.updatedAt))
-    .all();
-  return c.json({ drafts: rows.map(rowToDraft) });
+
+  const conds = ["d.project_id = ?1"];
+  const binds: (string | number)[] = [projectId.data, c.var.user.id];
+  if (status) { conds.push(`d.status = ?${binds.length + 1}`); binds.push(status); }
+  if (trackId) { conds.push(`d.track_id = ?${binds.length + 1}`); binds.push(trackId); }
+
+  const sql = `
+    SELECT d.id, d.project_id, d.track_id, d.account_id, d.status,
+           d.title, d.body, d.platform_options, d.platform_draft_id,
+           d.track_offset_minutes, d.sequence_in_track,
+           d.scheduled_for, d.scheduled_tz,
+           d.created_by, d.created_at, d.updated_at, d.archived_at
+    FROM drafts d
+    JOIN project_members pm
+      ON pm.project_id = d.project_id AND pm.user_id = ?2
+    WHERE ${conds.join(" AND ")}
+    ORDER BY d.updated_at DESC
+  `;
+  const { results } = await c.env.DB.prepare(sql).bind(...binds).all<DraftRow>();
+  if (!results || results.length === 0) {
+    const probe = await c.env.DB
+      .prepare("SELECT 1 AS ok FROM project_members WHERE project_id = ?1 AND user_id = ?2 LIMIT 1")
+      .bind(projectId.data, c.var.user.id)
+      .first();
+    if (!probe) throw NotFound("project not found or no access");
+    return c.json({ drafts: [] });
+  }
+  return c.json({ drafts: results.map(rawToDraft) });
 });
 
-// GET /api/drafts/:id
+// GET /api/drafts/:id — JOIN role-check.
 app.get("/:id", async (c) => {
   const id = idSchema.safeParse(c.req.param("id"));
   if (!id.success) throw BadRequest("invalid id");
-  const d = db(c.env.DB);
-  const row = await d.select().from(schema.drafts).where(eq(schema.drafts.id, id.data)).get();
-  if (!row) throw NotFound();
-  await requireRole(c.env.DB, row.projectId, c.var.user.id, "viewer");
-  return c.json({ draft: rowToDraft(row) });
+  const row = await c.env.DB
+    .prepare(
+      `SELECT d.id, d.project_id, d.track_id, d.account_id, d.status,
+              d.title, d.body, d.platform_options, d.platform_draft_id,
+              d.track_offset_minutes, d.sequence_in_track,
+              d.scheduled_for, d.scheduled_tz,
+              d.created_by, d.created_at, d.updated_at, d.archived_at,
+              pm.role AS my_role
+       FROM drafts d
+       LEFT JOIN project_members pm
+         ON pm.project_id = d.project_id AND pm.user_id = ?2
+       WHERE d.id = ?1`,
+    )
+    .bind(id.data, c.var.user.id)
+    .first<DraftRow & { my_role: string | null }>();
+  if (!row || !row.my_role) throw NotFound();
+  return c.json({ draft: rawToDraft(row) });
 });
 
 // POST /api/drafts

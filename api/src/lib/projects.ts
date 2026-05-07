@@ -1,8 +1,8 @@
-// Project membership / role checks.
+// Project membership / role checks. Hot path on nearly every authed
+// request — uses raw D1 prepared statements (no Drizzle round-trip)
+// and reads a single column.
 
-import { and, eq } from "drizzle-orm";
 import type { ProjectRole } from "@smm/shared";
-import { db, schema } from "../db/index.ts";
 import { Forbidden, NotFound } from "./errors.ts";
 
 const ROLE_RANK: Record<ProjectRole, number> = { viewer: 1, editor: 2, owner: 3 };
@@ -12,11 +12,10 @@ export const getRole = async (
   projectId: string,
   userId: string,
 ): Promise<ProjectRole | null> => {
-  const row = await db(d1)
-    .select({ role: schema.projectMembers.role })
-    .from(schema.projectMembers)
-    .where(and(eq(schema.projectMembers.projectId, projectId), eq(schema.projectMembers.userId, userId)))
-    .get();
+  const row = await d1
+    .prepare("SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2")
+    .bind(projectId, userId)
+    .first<{ role: string }>();
   return (row?.role as ProjectRole | undefined) ?? null;
 };
 

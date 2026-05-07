@@ -49,6 +49,47 @@ const rowToUser = (r: typeof schema.users.$inferSelect): User => ({
   lastSeen: r.lastSeen,
 });
 
+// Cache the verified-cookie -> user mapping in KV for 60s. Bypassing
+// the D1 SELECT on the hot read path is the single biggest p99 win
+// because every authed request was paying for it.
+//
+// Cache keyed on the SIGNED cookie value (not just userId) so a
+// session rotated by a SESSION_SIGNING_KEY rotation invalidates
+// itself naturally.
+const SESSION_CACHE_TTL = 60;
+const sessionCacheKey = (cookie: string): string => `sess:${cookie.slice(0, 80)}`;
+
+interface CachedUser {
+  id: string;
+  email: string;
+  name: string | null;
+  pictureUrl: string | null;
+  createdAt: string;
+  lastSeen: string | null;
+}
+
+const cacheUser = async (env: Env, cookie: string, user: User): Promise<void> => {
+  if (!env.KV) return;
+  const cached: CachedUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    pictureUrl: user.pictureUrl,
+    createdAt: user.createdAt,
+    lastSeen: user.lastSeen,
+  };
+  await env.KV.put(sessionCacheKey(cookie), JSON.stringify(cached), {
+    expirationTtl: SESSION_CACHE_TTL,
+  });
+};
+
+const cachedUser = async (env: Env, cookie: string): Promise<User | null> => {
+  if (!env.KV) return null;
+  const raw = await env.KV.get(sessionCacheKey(cookie));
+  if (!raw) return null;
+  try { return JSON.parse(raw) as User; } catch { return null; }
+};
+
 const authViaCfAccess = async (c: Context<{ Bindings: Env }>): Promise<User> => {
   const jwt = c.req.header("Cf-Access-Jwt-Assertion");
   if (!jwt) throw Unauthorized("missing CF Access JWT");
@@ -71,16 +112,35 @@ const authViaSessionCookie = async (c: Context<{ Bindings: Env }>): Promise<User
   const env = c.env;
   const cookie = readCookie(c.req.header("Cookie"), cookieName(env));
   if (!cookie) throw Unauthorized("not signed in");
+
+  const cached = await cachedUser(env, cookie);
+  if (cached) return cached;
+
   const session = await verifySession(env, cookie);
   if (!session) throw Unauthorized("invalid or expired session");
-  const row = await db(env.DB).select().from(schema.users).where(eq(schema.users.id, session.userId)).get();
+
+  const row = await env.DB
+    .prepare("SELECT id, email, name, picture_url, created_at, last_seen FROM users WHERE id = ?1")
+    .bind(session.userId)
+    .first<{ id: string; email: string; name: string | null; picture_url: string | null; created_at: string; last_seen: string | null }>();
   if (!row) throw Unauthorized("user not found");
-  await db(env.DB)
-    .update(schema.users)
-    .set({ lastSeen: sql`(datetime('now'))` })
-    .where(eq(schema.users.id, row.id))
-    .run();
-  return rowToUser(row);
+
+  // Best-effort lastSeen update — fire and forget so the auth path
+  // doesn't pay round-trip for it.
+  c.executionCtx?.waitUntil(
+    env.DB.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?1").bind(row.id).run(),
+  );
+
+  const user: User = {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    pictureUrl: row.picture_url,
+    createdAt: row.created_at,
+    lastSeen: row.last_seen,
+  };
+  c.executionCtx?.waitUntil(cacheUser(env, cookie, user));
+  return user;
 };
 
 const authViaApiKey = async (c: Context<{ Bindings: Env }>): Promise<User | null> => {

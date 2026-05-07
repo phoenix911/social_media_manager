@@ -18,19 +18,28 @@ const rowToProject = (r: typeof schema.projects.$inferSelect): Project => ({
   archivedAt: r.archivedAt,
 });
 
-// GET /api/projects — list projects this user is a member of
+// GET /api/projects — list projects this user is a member of.
+// Single JOIN, raw prepared statement (was 2 queries via Drizzle).
 app.get("/", async (c) => {
-  const user = c.var.user;
-  const d = db(c.env.DB);
-  const memberOf = await d
-    .select({ projectId: schema.projectMembers.projectId })
-    .from(schema.projectMembers)
-    .where(eq(schema.projectMembers.userId, user.id))
-    .all();
-  if (!memberOf.length) return c.json({ projects: [] });
-  const ids = memberOf.map((m) => m.projectId);
-  const rows = await d.select().from(schema.projects).where(inArray(schema.projects.id, ids)).all();
-  return c.json({ projects: rows.map(rowToProject) });
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT p.id, p.slug, p.name, p.description, p.owner_id, p.created_at, p.archived_at
+       FROM projects p
+       JOIN project_members pm ON pm.project_id = p.id
+       WHERE pm.user_id = ?1 AND p.archived_at IS NULL`,
+    )
+    .bind(c.var.user.id)
+    .all<{ id: string; slug: string; name: string; description: string | null; owner_id: string; created_at: string; archived_at: string | null }>();
+  const projects: Project[] = (results ?? []).map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    description: r.description,
+    ownerId: r.owner_id,
+    createdAt: r.created_at,
+    archivedAt: r.archived_at,
+  }));
+  return c.json({ projects });
 });
 
 // POST /api/projects — create a project; creator becomes owner
@@ -65,15 +74,34 @@ app.post("/", async (c) => {
   return c.json({ project: rowToProject(inserted) }, 201);
 });
 
-// GET /api/projects/:slug
+// GET /api/projects/:slug — fetch + role-check in a single LEFT JOIN.
+// Distinguishes "no project" (404) from "exists but no role" (404 too,
+// to avoid leaking existence) without two round-trips.
 app.get("/:slug", async (c) => {
   const slug = slugSchema.safeParse(c.req.param("slug"));
   if (!slug.success) throw BadRequest("invalid slug");
-  const d = db(c.env.DB);
-  const row = await d.select().from(schema.projects).where(eq(schema.projects.slug, slug.data)).get();
-  if (!row) throw NotFound();
-  await requireRole(c.env.DB, row.id, c.var.user.id, "viewer");
-  return c.json({ project: rowToProject(row) });
+  const row = await c.env.DB
+    .prepare(
+      `SELECT p.id, p.slug, p.name, p.description, p.owner_id, p.created_at, p.archived_at, pm.role
+       FROM projects p
+       LEFT JOIN project_members pm
+         ON pm.project_id = p.id AND pm.user_id = ?2
+       WHERE p.slug = ?1`,
+    )
+    .bind(slug.data, c.var.user.id)
+    .first<{ id: string; slug: string; name: string; description: string | null; owner_id: string; created_at: string; archived_at: string | null; role: string | null }>();
+  if (!row || !row.role) throw NotFound();
+  return c.json({
+    project: {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      ownerId: row.owner_id,
+      createdAt: row.created_at,
+      archivedAt: row.archived_at,
+    } as Project,
+  });
 });
 
 export default app;

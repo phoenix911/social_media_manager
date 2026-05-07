@@ -26,29 +26,71 @@ const rowToTrack = (r: typeof schema.tracks.$inferSelect): Track => ({
   archivedAt: r.archivedAt,
 });
 
-// GET /api/tracks?projectId=
+interface TrackRow {
+  id: string; project_id: string; name: string; description: string | null;
+  account_id: string | null; start_at: string | null; tz: string | null;
+  created_by: string; created_at: string; archived_at: string | null;
+}
+const rawToTrack = (r: TrackRow): Track => ({
+  id: r.id,
+  projectId: r.project_id,
+  name: r.name,
+  description: r.description,
+  accountId: r.account_id,
+  startAt: r.start_at,
+  tz: r.tz,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+  archivedAt: r.archived_at,
+});
+
+// GET /api/tracks?projectId= — JOIN role-check + list, single round-trip.
 app.get("/", async (c) => {
   const projectId = idSchema.safeParse(c.req.query("projectId"));
   if (!projectId.success) throw BadRequest("projectId required");
-  await requireRole(c.env.DB, projectId.data, c.var.user.id, "viewer");
-
-  const rows = await db(c.env.DB)
-    .select()
-    .from(schema.tracks)
-    .where(eq(schema.tracks.projectId, projectId.data))
-    .orderBy(desc(schema.tracks.createdAt))
-    .all();
-  return c.json({ tracks: rows.map(rowToTrack) });
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT t.id, t.project_id, t.name, t.description, t.account_id,
+              t.start_at, t.tz, t.created_by, t.created_at, t.archived_at,
+              pm.role AS my_role
+       FROM tracks t
+       JOIN project_members pm
+         ON pm.project_id = t.project_id AND pm.user_id = ?2
+       WHERE t.project_id = ?1
+       ORDER BY t.created_at DESC`,
+    )
+    .bind(projectId.data, c.var.user.id)
+    .all<TrackRow & { my_role: string | null }>();
+  if (!results || results.length === 0) {
+    // Could be "no tracks" or "no role" — distinguish with one cheap probe.
+    const probe = await c.env.DB
+      .prepare("SELECT 1 AS ok FROM project_members WHERE project_id = ?1 AND user_id = ?2 LIMIT 1")
+      .bind(projectId.data, c.var.user.id)
+      .first();
+    if (!probe) throw NotFound("project not found or no access");
+    return c.json({ tracks: [] });
+  }
+  return c.json({ tracks: results.map(rawToTrack) });
 });
 
-// GET /api/tracks/:id
+// GET /api/tracks/:id — single JOIN with role-check.
 app.get("/:id", async (c) => {
   const id = idSchema.safeParse(c.req.param("id"));
   if (!id.success) throw BadRequest("invalid id");
-  const row = await db(c.env.DB).select().from(schema.tracks).where(eq(schema.tracks.id, id.data)).get();
-  if (!row) throw NotFound();
-  await requireRole(c.env.DB, row.projectId, c.var.user.id, "viewer");
-  return c.json({ track: rowToTrack(row) });
+  const row = await c.env.DB
+    .prepare(
+      `SELECT t.id, t.project_id, t.name, t.description, t.account_id,
+              t.start_at, t.tz, t.created_by, t.created_at, t.archived_at,
+              pm.role AS my_role
+       FROM tracks t
+       LEFT JOIN project_members pm
+         ON pm.project_id = t.project_id AND pm.user_id = ?2
+       WHERE t.id = ?1`,
+    )
+    .bind(id.data, c.var.user.id)
+    .first<TrackRow & { my_role: string | null }>();
+  if (!row || !row.my_role) throw NotFound();
+  return c.json({ track: rawToTrack(row) });
 });
 
 // POST /api/tracks
