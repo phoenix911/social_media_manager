@@ -56,6 +56,10 @@ max_batch_timeout = 30
 # 30 3 * * *  — daily reminders at 9am IST (UTC+5:30 → 03:30 UTC)
 crons = ["* * * * *", "30 3 * * *"]
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 # ────────────────────────────────────────────────────────────────────
 # [vars] — these become editable input fields in the
 # "Deploy to Cloudflare" form. Defaults below are placeholders; the
