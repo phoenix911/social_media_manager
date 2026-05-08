@@ -32,8 +32,9 @@ export const PLATFORMS_META: PlatformMeta[] = [
     oauth: "recommended",
     setup: [
       { text: "Read Reddit's Responsible Builder Policy.", link: { url: "https://support.reddithelp.com/hc/en-us/articles/42728983564564-Responsible-Builder-Policy" } },
-      { text: "Open the Reddit apps page.", link: { url: "https://www.reddit.com/prefs/apps" } },
-      { text: "Click 'create another app' and pick type 'web app'." },
+      { text: "Sign in to Reddit (the dev console returns 403 for signed-out users), then open the apps page.", link: { url: "https://www.reddit.com/prefs/apps" } },
+      { text: "If the page is blank or 403s, use old.reddit.com — same form, more reliable across browsers + extensions.", link: { url: "https://old.reddit.com/prefs/apps" } },
+      { text: "Scroll to the bottom; click 'create another app'; pick type 'web app'." },
       { text: "Set the redirect URI to:", copy: REDIRECT("reddit") },
       { text: "Copy client_id and secret into Worker secrets (REDDIT_CLIENT_ID/SECRET) + REDDIT_USERNAME_FOR_UA." },
       { text: "Click 'Connect via OAuth' below." },

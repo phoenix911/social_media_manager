@@ -25,20 +25,37 @@ can't run the OAuth flow. With them, any project member can connect
 
 ## Steps
 
-1. Sign in to Reddit with the account you want to act as the **app
-   owner**. (This is the developer account; per-project accounts will
-   OAuth in separately later.)
-2. Go to <https://www.reddit.com/prefs/apps>.
-3. Scroll to bottom → click **create another app** (or **create an
+1. **Sign in to Reddit first** with the account you want to act as
+   the **app owner** (this is the developer account; per-project
+   accounts OAuth in separately later). The dev console returns 403 /
+   blank for everyone who isn't signed in.
+2. Open the dev console. Try in this order if one fails:
+   - <https://www.reddit.com/prefs/apps> ← canonical
+   - <https://old.reddit.com/prefs/apps> ← reliable fallback (the
+     non-redesigned page renders even when the React app on www
+     stalls)
+   - <https://sh.reddit.com/prefs/apps> ← shreddit alternate
+3. **If the page is blank** (you're signed in but nothing renders):
+   - It's almost always anti-bot / browser-fingerprint heuristics.
+     Open in **incognito** or in a different browser, or disable any
+     content blockers / privacy extensions for `reddit.com`.
+   - On a fresh Reddit account: Reddit gates the dev console behind
+     "verified email + age ≥ 1 day". Confirm the verification email
+     and retry.
+   - Some VPN exits / TOR exits get 403 unconditionally — switch
+     network.
+   - Last resort: go to `https://old.reddit.com/prefs/apps`. Old
+     Reddit always renders the form.
+4. Scroll to bottom → click **create another app** (or **create an
    app** if it's your first).
-4. Fill in:
+5. Fill in:
    - **name:** `smm` (or whatever you like — only you see this)
    - **type:** select **web app** (not script, not installed)
    - **description:** optional
    - **about url:** `https://smm.example.com`
    - **redirect uri:** `https://smm.example.com/api/oauth/reddit/callback`
-5. Click **create app**.
-6. The new card shows two values:
+6. Click **create app**.
+7. The new card shows two values:
    - **client id** — short string under the app name (looks like `j3K…`)
    - **secret** — labeled `secret`, long string
 
