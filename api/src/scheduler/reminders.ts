@@ -35,8 +35,23 @@ const istNowParts = (): { dateIso: string; rangeStart: string; rangeEnd: string;
 const resolveTarget = async (env: Env, target: string): Promise<string | null> => {
   if (!target.startsWith("@")) return target; // numeric, use as-is
   const username = target.slice(1).toLowerCase();
-  const chatId = await env.KV.get(`tg:chat_by_username:${username}`);
-  return chatId; // null if the user hasn't messaged the bot yet
+  const cached = await env.KV.get(`tg:chat_by_username:${username}`);
+  if (cached) return cached;
+
+  // Fallback: if the allowlist env carries both @username and a numeric
+  // id, infer the pairing. Catches the silent-skip case where a user is
+  // allowed via numeric chat_id but their Telegram username is private,
+  // so the webhook never writes the KV mapping. Conservative — only
+  // matches when there's exactly one numeric id in the allowlist (no
+  // ambiguity).
+  const tokens = (env.TELEGRAM_ALLOWED_CHAT_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hasUsername = tokens.some((t) => t.toLowerCase() === `@${username}`);
+  if (!hasUsername) return null;
+  const numerics = tokens.filter((t) => !t.startsWith("@"));
+  return numerics.length === 1 ? numerics[0]! : null;
 };
 
 const esc = (s: string): string =>
