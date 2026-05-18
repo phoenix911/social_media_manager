@@ -26,6 +26,9 @@ export interface Env {
   SESSION_SIGNING_KEY?: string;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  /** One-shot seed token for the dummy IG account. Self-disables once
+   *  consumed; delete after first run. */
+  INSTAGRAM_USER_ACCESS_TOKEN?: string;
 
   REDDIT_CLIENT_ID?: string;
   REDDIT_CLIENT_SECRET?: string;

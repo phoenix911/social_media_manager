@@ -16,6 +16,8 @@ import oauthRoutes from "./routes/oauth.ts";
 import accountsRoutes from "./routes/accounts.ts";
 import scheduleRoutes from "./routes/schedule.ts";
 import telegramRoutes from "./routes/telegram.ts";
+import mediaPublicRoutes from "./routes/media-public.ts";
+import adminRoutes from "./routes/_admin.ts";
 import ownerRoutes from "./routes/owners.ts";
 import reminderRoutes from "./routes/reminders.ts";
 import authRoutes from "./routes/auth.ts";
@@ -37,6 +39,14 @@ app.get("/health", (c) => c.json({ ok: true, env: c.env.ENVIRONMENT }));
 // by CF Access (Telegram won't authenticate). Mounted before the auth
 // middleware so it bypasses requireUser.
 app.route("/api/telegram", telegramRoutes);
+
+// Public HMAC-signed media route. Mounted before requireUser so
+// external services (Instagram, etc.) can fetch the bytes using a
+// short-lived signed URL. Auth is purely HMAC over (mediaId, exp).
+app.route("/api/media/public", mediaPublicRoutes);
+
+// Narrow self-disabling admin routes. See _admin.ts for the gating.
+app.route("/api/_admin", adminRoutes);
 
 // Auth routes (passkey + email-OTP) live before requireUser; they
 // either don't need a session yet (login/register start) or apply

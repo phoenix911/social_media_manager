@@ -6,6 +6,7 @@ import { swrFetcher } from "@/lib/api";
 import { bootTheme } from "@/store/themeStore";
 import { initPwa } from "@/lib/pwa";
 import { initInstall } from "@/store/installStore";
+import { ToastProvider } from "@/components/Toast";
 import "./index.css";
 
 bootTheme();
@@ -28,6 +29,7 @@ import Mcp from "./pages/Mcp";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <SWRConfig value={{ fetcher: swrFetcher, revalidateOnFocus: false }}>
+     <ToastProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -47,6 +49,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
         </Routes>
       </BrowserRouter>
+     </ToastProvider>
     </SWRConfig>
   </React.StrictMode>,
 );

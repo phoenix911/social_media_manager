@@ -113,6 +113,30 @@ arbitrarily — most exist because of a real bug or trade-off.
 - Don't reference the current task / PR / issue in comments —
   it'll rot.
 
+## Data fetching (web ↔ api)
+
+- **No page-bundle endpoints.** Don't build `/api/page/home`. Resource
+  endpoints (`/api/projects`, `/api/tracks`, `/api/drafts`) are
+  cacheable, dedupable across pages by SWR, and surgically
+  invalidatable after mutations. A blob endpoint loses all of that and
+  saves nothing meaningful (Workers' per-request charge is negligible
+  vs. CPU/D1/KV reads).
+- **Aggregate at the resource, not the page.** If the UI is fetching
+  full lists just to count or pluck a label, fold the aggregate into
+  the list query instead — `trackCount`, `channelCount`, `platforms`
+  on `GET /api/projects`; `draftCount` on `GET /api/tracks`. Done with
+  correlated subqueries in the same SELECT, one round-trip.
+- **Never count by fetching all rows.** A `useSWR` that pulls every
+  draft just to render `len(drafts)` is the smell. Add a count column
+  to the parent resource.
+- **One `useSWR` per *resource*, not per *card*.** Avoid `<Tile>`
+  components that each fire their own request — fan-out scales with
+  list length and breaks SWR dedupe. Hoist the fetch to the parent.
+- **Extend response types as `*Summary` (e.g. `ProjectSummary`,
+  `TrackSummary`)** so the base domain type stays clean and other
+  callers that don't need the aggregates aren't paying for them
+  type-wise.
+
 ## Testing
 
 - **No test infra yet.** When we add it: prefer integration tests

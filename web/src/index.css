@@ -7,86 +7,175 @@
 @theme {
   --radius: 0.5rem;
 
-  /* Light tokens (default; can be overridden by [data-theme="dark"]). */
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.985 0 0);
-  --color-ring: oklch(0.708 0 0);
+  /* Type families — editorial / quiet-luxury direction. */
+  --font-serif: "Fraunces", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --font-sans:  "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:  "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Light tokens — warm cream + ink + one accent (deep forest).
+     Slight warmth in the cream prevents the "blank form" feel of pure
+     white; the forest accent is the only saturated color in the UI. */
+  --color-background:           oklch(0.985 0.005 95);   /* #FAFAF6  warm off-white */
+  --color-foreground:           oklch(0.20 0.005 70);    /* #1A1A1A  ink */
+  --color-muted:                oklch(0.945 0.012 92);   /* #F0EDE2  surface tint */
+  --color-muted-foreground:     oklch(0.55 0.01 80);     /* #6F6E68  muted ink */
+  --color-card:                 oklch(0.985 0.005 95);
+  --color-card-foreground:      oklch(0.20 0.005 70);
+  --color-border:               oklch(0.88 0.012 88);    /* #E6E2D6  warm hairline */
+  --color-input:                oklch(0.88 0.012 88);
+  --color-primary:              oklch(0.36 0.045 160);   /* #2F4F3E  deep forest */
+  --color-primary-foreground:   oklch(0.97 0.01 95);
+  --color-secondary:            oklch(0.945 0.012 92);
+  --color-secondary-foreground: oklch(0.20 0.005 70);
+  --color-accent:               oklch(0.92 0.018 150);   /* #E6EFE9 forest tint */
+  --color-accent-foreground:    oklch(0.36 0.045 160);
+  --color-destructive:          oklch(0.55 0.16 32);     /* #B5483B terracotta */
+  --color-destructive-foreground: oklch(0.97 0.01 95);
+  --color-ring:                 oklch(0.36 0.045 160);
 }
 
 @layer base {
   /* Default — light. JS may add `.dark` to <html> based on user pref. */
   :root { color-scheme: light; }
 
-  /* User-set dark, OR system-dark when user hasn't set anything. */
+  /* User-set dark, OR system-dark when user hasn't set anything.
+     Dark stays functional (not bespoke); same accent (forest) so the
+     two themes share a visual through-line. */
   .dark,
   :root.dark {
     color-scheme: dark;
-    --color-background: oklch(0.145 0 0);
-    --color-foreground: oklch(0.985 0 0);
-    --color-muted: oklch(0.269 0 0);
-    --color-muted-foreground: oklch(0.708 0 0);
-    --color-card: oklch(0.205 0 0);
-    --color-card-foreground: oklch(0.985 0 0);
-    --color-border: oklch(0.269 0 0);
-    --color-input: oklch(0.269 0 0);
-    --color-primary: oklch(0.985 0 0);
-    --color-primary-foreground: oklch(0.205 0 0);
-    --color-secondary: oklch(0.269 0 0);
-    --color-secondary-foreground: oklch(0.985 0 0);
-    --color-accent: oklch(0.269 0 0);
-    --color-accent-foreground: oklch(0.985 0 0);
-    --color-ring: oklch(0.439 0 0);
+    --color-background:           oklch(0.155 0.008 80);   /* warm near-black */
+    --color-foreground:           oklch(0.97 0.005 95);
+    --color-muted:                oklch(0.22 0.008 80);
+    --color-muted-foreground:     oklch(0.72 0.01 85);
+    --color-card:                 oklch(0.175 0.008 80);
+    --color-card-foreground:      oklch(0.97 0.005 95);
+    --color-border:               oklch(0.30 0.008 80);
+    --color-input:                oklch(0.30 0.008 80);
+    --color-primary:              oklch(0.78 0.06 160);   /* lighter forest for dark */
+    --color-primary-foreground:   oklch(0.15 0.01 80);
+    --color-secondary:            oklch(0.22 0.008 80);
+    --color-secondary-foreground: oklch(0.97 0.005 95);
+    --color-accent:               oklch(0.27 0.02 160);
+    --color-accent-foreground:    oklch(0.85 0.04 160);
+    --color-destructive:          oklch(0.66 0.16 32);
+    --color-destructive-foreground: oklch(0.97 0.005 95);
+    --color-ring:                 oklch(0.65 0.04 160);
   }
 
   body {
-    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "ss03", "cv11";  /* Geist stylistic alts */
     background: var(--color-background);
     color: var(--color-foreground);
     /* Avoid horizontal scroll on iOS landscape with the notch. */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Hide all scrollbars app-wide — content remains scrollable.
+     Editorial UI assumes scrolling is felt, not seen. */
+  html, body {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;      /* legacy Edge / IE */
+  }
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 }
 
-/* Datetime highlight — visual "red-marker" for every timestamp.
-   Subtle warm overlay so it reads as a hand-drawn highlighter,
-   not a system label. */
-.dt {
-  background-image: linear-gradient(
-    to right,
-    rgba(220, 38, 38, 0.18) 0%,
-    rgba(220, 38, 38, 0.28) 35%,
-    rgba(220, 38, 38, 0.22) 70%,
-    rgba(220, 38, 38, 0.18) 100%
-  );
-  padding: 0.05em 0.3em;
-  border-radius: 2px;
-  white-space: nowrap;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+/* ── Editorial type scale ──────────────────────────────────────────
+   Fraunces for display, Geist for body. Sizes tuned for a magazine
+   spread on desktop; mobile collapses via the responsive variants. */
+.text-display-xl   { font-family: var(--font-serif); font-size: 4.5rem; line-height: 1.05; letter-spacing: -0.02em; font-weight: 400; }
+.text-display-lg   { font-family: var(--font-serif); font-size: 3.5rem; line-height: 1.07; letter-spacing: -0.015em; font-weight: 400; }
+.text-display-md   { font-family: var(--font-serif); font-size: 2.75rem; line-height: 1.1; letter-spacing: -0.01em; font-weight: 400; }
+.text-display-sm   { font-family: var(--font-serif); font-size: 2rem; line-height: 1.15; letter-spacing: -0.005em; font-weight: 400; }
+.text-title        { font-family: var(--font-serif); font-size: 1.375rem; line-height: 1.35; font-weight: 500; }
+.text-body-lg      { font-family: var(--font-sans);  font-size: 1.0625rem; line-height: 1.55; }
+.text-small-caps   {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
 }
-.dark .dt {
-  background-image: linear-gradient(
-    to right,
-    rgba(248, 113, 113, 0.20) 0%,
-    rgba(248, 113, 113, 0.34) 35%,
-    rgba(248, 113, 113, 0.26) 70%,
-    rgba(248, 113, 113, 0.20) 100%
-  );
+@media (max-width: 640px) {
+  .text-display-xl { font-size: 3rem; }
+  .text-display-lg { font-size: 2.5rem; }
+  .text-display-md { font-size: 2rem; }
+  .text-display-sm { font-size: 1.625rem; }
+}
+
+/* The visual hook of the redesign: an oldstyle serif numeral rendered
+   in the left rail of every editorial row. Faint, large, intentional. */
+.serif-numeral {
+  font-family: var(--font-serif);
+  font-feature-settings: "onum", "lnum" off, "pnum";
+  font-weight: 300;
+  font-size: 3rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: oldstyle-nums proportional-nums;
+}
+@media (max-width: 640px) { .serif-numeral { font-size: 2.25rem; } }
+
+/* Hairline rule — single-pixel divider tinted with the warm border. */
+.hairline   { border-color: var(--color-border); }
+.hr-hairline { border-top: 1px solid var(--color-border); }
+
+/* Editorial divider: hairline + small-caps label. */
+.divider-cap {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+.divider-cap::before,
+.divider-cap::after { content: ""; flex: 1; border-top: 1px solid var(--color-border); }
+.divider-cap > span {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
+/* Tabular numerals everywhere a count/ID/date sits in flowing copy. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Subtle ink-fade on hover used by editorial rows. */
+.row-link { transition: opacity 200ms ease-out, color 200ms ease-out; }
+.row-link:hover { opacity: 0.78; }
+
+/* Editorial body (for caption editing in the draft editor) */
+.editorial-body {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+/* Datetime — now a quiet small-caps treatment instead of red-marker.
+   Keeps timestamps legible without screaming. */
+.dt {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  letter-spacing: 0.02em;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Reusable safe-area helpers for parts of the layout that need it. */

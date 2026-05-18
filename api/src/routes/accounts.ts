@@ -8,6 +8,7 @@ import { BadRequest, NotFound } from "../lib/errors.ts";
 import { requireRole } from "../lib/projects.ts";
 import { insertAccount, revokeAccount } from "../lib/account-tokens.ts";
 import { ensureOwnerForUser } from "../lib/owners.ts";
+import { encryptToken } from "../lib/crypto.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -231,6 +232,55 @@ app.delete("/:id/projects/:projectId", async (c) => {
     .bind(projectId.data, id.data)
     .run();
   return c.json({ ok: true });
+});
+
+// POST /api/accounts/:id/inject-token — manual injection path for cases
+// where a token came from outside our OAuth callback (e.g. a long-lived
+// token pasted from the Meta dashboard during onboarding). Caller must
+// be in the same owner group as the account row (same visibility rule
+// as GET /api/accounts).
+app.post("/:id/inject-token", async (c) => {
+  const id = idSchema.safeParse(c.req.param("id"));
+  if (!id.success) throw BadRequest("invalid id");
+  const body = (await c.req.json().catch(() => null)) as {
+    accessToken?: string;
+    expiresAt?: string | null;
+    scopes?: string;
+  } | null;
+  if (!body?.accessToken || typeof body.accessToken !== "string") {
+    throw BadRequest("accessToken required");
+  }
+
+  // Owner-visibility check — same shape as DELETE /api/accounts/:id.
+  const shared = await c.env.DB
+    .prepare(
+      `SELECT 1 FROM account_owners ao
+         JOIN owner_emails oe ON oe.owner_id = ao.owner_id
+        WHERE ao.account_id = ?1 AND oe.email = ?2
+        LIMIT 1`,
+    )
+    .bind(id.data, c.var.user.email)
+    .first();
+  if (!shared) throw NotFound();
+
+  const envelope = await encryptToken(body.accessToken, c.env.SMM_TOKEN_KEY);
+  const now = new Date().toISOString();
+  const scopes = body.scopes ?? "instagram_business_basic,instagram_business_content_publish";
+  await c.env.DB
+    .prepare(
+      `UPDATE accounts
+          SET access_token = ?1,
+              scopes       = ?2,
+              expires_at   = ?3,
+              revoked_at   = NULL,
+              meta         = json_set(COALESCE(meta, '{}'),
+                                       '$.placeholder', json('false'),
+                                       '$.tokenSeededAt', ?4)
+        WHERE id = ?5`,
+    )
+    .bind(envelope, scopes, body.expiresAt ?? null, now, id.data)
+    .run();
+  return c.json({ ok: true, expiresAt: body.expiresAt ?? null });
 });
 
 void and; // keep import linter happy if and is unused after refactor

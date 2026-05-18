@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
-import { createDraftSchema, idSchema, updateDraftSchema, type Draft } from "@smm/shared";
+import { createDraftSchema, idSchema, updateDraftSchema, type Draft, type DraftSummary } from "@smm/shared";
 import type { Env } from "../env.ts";
 import { db, schema } from "../db/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
@@ -37,6 +37,7 @@ interface DraftRow {
   track_offset_minutes: number | null; sequence_in_track: number | null;
   scheduled_for: string | null; scheduled_tz: string | null;
   created_by: string; created_at: string; updated_at: string; archived_at: string | null;
+  media_count?: number;
 }
 const rawToDraft = (r: DraftRow): Draft => ({
   id: r.id,
@@ -76,7 +77,8 @@ app.get("/", async (c) => {
            d.title, d.body, d.platform_options, d.platform_draft_id,
            d.track_offset_minutes, d.sequence_in_track,
            d.scheduled_for, d.scheduled_tz,
-           d.created_by, d.created_at, d.updated_at, d.archived_at
+           d.created_by, d.created_at, d.updated_at, d.archived_at,
+           (SELECT COUNT(*) FROM draft_media dm WHERE dm.draft_id = d.id) AS media_count
     FROM drafts d
     JOIN project_members pm
       ON pm.project_id = d.project_id AND pm.user_id = ?2
@@ -90,9 +92,13 @@ app.get("/", async (c) => {
       .bind(projectId.data, c.var.user.id)
       .first();
     if (!probe) throw NotFound("project not found or no access");
-    return c.json({ drafts: [] });
+    return c.json({ drafts: [] as DraftSummary[] });
   }
-  return c.json({ drafts: results.map(rawToDraft) });
+  const drafts: DraftSummary[] = results.map((r) => ({
+    ...rawToDraft(r),
+    mediaCount: r.media_count ?? 0,
+  }));
+  return c.json({ drafts });
 });
 
 // GET /api/drafts/:id — JOIN role-check.
@@ -106,6 +112,7 @@ app.get("/:id", async (c) => {
               d.track_offset_minutes, d.sequence_in_track,
               d.scheduled_for, d.scheduled_tz,
               d.created_by, d.created_at, d.updated_at, d.archived_at,
+              (SELECT COUNT(*) FROM draft_media dm WHERE dm.draft_id = d.id) AS media_count,
               pm.role AS my_role
        FROM drafts d
        LEFT JOIN project_members pm
@@ -115,7 +122,8 @@ app.get("/:id", async (c) => {
     .bind(id.data, c.var.user.id)
     .first<DraftRow & { my_role: string | null }>();
   if (!row || !row.my_role) throw NotFound();
-  return c.json({ draft: rawToDraft(row) });
+  const summary: DraftSummary = { ...rawToDraft(row), mediaCount: row.media_count ?? 0 };
+  return c.json({ draft: summary });
 });
 
 // POST /api/drafts

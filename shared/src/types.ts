@@ -33,6 +33,14 @@ export interface Project {
   archivedAt: string | null;
 }
 
+/** Summary returned by GET /api/projects (list) — includes aggregate counts so
+ *  callers don't need follow-up fetches per project. */
+export interface ProjectSummary extends Project {
+  trackCount: number;
+  channelCount: number;
+  platforms: Platform[];
+}
+
 export interface ProjectMember {
   projectId: string;
   userId: string;
@@ -83,6 +91,12 @@ export interface Track {
   archivedAt: string | null;
 }
 
+/** Summary returned by GET /api/tracks (list) — adds the draft count so the
+ *  dashboard doesn't need to fetch every draft to display per-track totals. */
+export interface TrackSummary extends Track {
+  draftCount: number;
+}
+
 export interface Draft {
   id: string;
   projectId: string;
@@ -104,6 +118,12 @@ export interface Draft {
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
+}
+
+/** Draft + cheap aggregates the list view needs (so the row can show
+ *  "missing: media/channel" without an extra request per card). */
+export interface DraftSummary extends Draft {
+  mediaCount: number;
 }
 
 export interface Media {

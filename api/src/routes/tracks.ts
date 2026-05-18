@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import { eq, and, desc } from "drizzle-orm";
-import { createTrackSchema, idSchema, updateTrackSchema, type Track } from "@smm/shared";
+import { createTrackSchema, idSchema, updateTrackSchema, type Track, type TrackSummary } from "@smm/shared";
 import type { Env } from "../env.ts";
 import { db, schema } from "../db/index.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
@@ -44,7 +44,10 @@ const rawToTrack = (r: TrackRow): Track => ({
   archivedAt: r.archived_at,
 });
 
-// GET /api/tracks?projectId= — JOIN role-check + list, single round-trip.
+// GET /api/tracks?projectId= — JOIN role-check + list with per-track
+// draft_count, single round-trip. The count is folded in so the
+// dashboard doesn't need a parallel /api/drafts fetch just to display
+// totals.
 app.get("/", async (c) => {
   const projectId = idSchema.safeParse(c.req.query("projectId"));
   if (!projectId.success) throw BadRequest("projectId required");
@@ -52,7 +55,9 @@ app.get("/", async (c) => {
     .prepare(
       `SELECT t.id, t.project_id, t.name, t.description, t.account_id,
               t.start_at, t.tz, t.created_by, t.created_at, t.archived_at,
-              pm.role AS my_role
+              pm.role AS my_role,
+              (SELECT COUNT(*) FROM drafts d
+                WHERE d.track_id = t.id AND d.archived_at IS NULL) AS draft_count
        FROM tracks t
        JOIN project_members pm
          ON pm.project_id = t.project_id AND pm.user_id = ?2
@@ -60,7 +65,7 @@ app.get("/", async (c) => {
        ORDER BY t.created_at DESC`,
     )
     .bind(projectId.data, c.var.user.id)
-    .all<TrackRow & { my_role: string | null }>();
+    .all<TrackRow & { my_role: string | null; draft_count: number }>();
   if (!results || results.length === 0) {
     // Could be "no tracks" or "no role" — distinguish with one cheap probe.
     const probe = await c.env.DB
@@ -70,7 +75,11 @@ app.get("/", async (c) => {
     if (!probe) throw NotFound("project not found or no access");
     return c.json({ tracks: [] });
   }
-  return c.json({ tracks: results.map(rawToTrack) });
+  const tracks: TrackSummary[] = results.map((r) => ({
+    ...rawToTrack(r),
+    draftCount: r.draft_count ?? 0,
+  }));
+  return c.json({ tracks });
 });
 
 // GET /api/tracks/:id — single JOIN with role-check.

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, eq, inArray } from "drizzle-orm";
-import { createProjectSchema, slugSchema, type Project } from "@smm/shared";
+import { createProjectSchema, slugSchema, type Platform, type Project, type ProjectSummary } from "@smm/shared";
 import type { Env } from "../env.ts";
 import { db, schema } from "../db/index.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
@@ -18,19 +18,33 @@ const rowToProject = (r: typeof schema.projects.$inferSelect): Project => ({
   archivedAt: r.archivedAt,
 });
 
-// GET /api/projects — list projects this user is a member of.
-// Single JOIN, raw prepared statement (was 2 queries via Drizzle).
+// GET /api/projects — list projects this user is a member of, with
+// per-project aggregates (track count, live channel count, distinct
+// platforms). Folded into the list query so the home page doesn't fan
+// out N extra requests per tile.
 app.get("/", async (c) => {
   const { results } = await c.env.DB
     .prepare(
-      `SELECT p.id, p.slug, p.name, p.description, p.owner_id, p.created_at, p.archived_at
+      `SELECT p.id, p.slug, p.name, p.description, p.owner_id, p.created_at, p.archived_at,
+              (SELECT COUNT(*) FROM tracks t
+                WHERE t.project_id = p.id AND t.archived_at IS NULL) AS track_count,
+              (SELECT COUNT(*) FROM project_accounts ap
+                JOIN accounts a ON a.id = ap.account_id
+                WHERE ap.project_id = p.id AND a.revoked_at IS NULL) AS channel_count,
+              (SELECT GROUP_CONCAT(DISTINCT a.platform) FROM project_accounts ap
+                JOIN accounts a ON a.id = ap.account_id
+                WHERE ap.project_id = p.id AND a.revoked_at IS NULL) AS platforms_csv
        FROM projects p
        JOIN project_members pm ON pm.project_id = p.id
        WHERE pm.user_id = ?1 AND p.archived_at IS NULL`,
     )
     .bind(c.var.user.id)
-    .all<{ id: string; slug: string; name: string; description: string | null; owner_id: string; created_at: string; archived_at: string | null }>();
-  const projects: Project[] = (results ?? []).map((r) => ({
+    .all<{
+      id: string; slug: string; name: string; description: string | null;
+      owner_id: string; created_at: string; archived_at: string | null;
+      track_count: number; channel_count: number; platforms_csv: string | null;
+    }>();
+  const projects: ProjectSummary[] = (results ?? []).map((r) => ({
     id: r.id,
     slug: r.slug,
     name: r.name,
@@ -38,6 +52,9 @@ app.get("/", async (c) => {
     ownerId: r.owner_id,
     createdAt: r.created_at,
     archivedAt: r.archived_at,
+    trackCount: r.track_count ?? 0,
+    channelCount: r.channel_count ?? 0,
+    platforms: r.platforms_csv ? (r.platforms_csv.split(",").sort() as Platform[]) : [],
   }));
   return c.json({ projects });
 });

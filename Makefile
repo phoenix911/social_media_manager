@@ -43,16 +43,23 @@ db-apply-remote: ## apply migrations to remote D1
 typecheck: ## tsc --noEmit across all workspaces
 	$(BUN) --filter '*' typecheck
 
-build: ## build api + web
-	$(BUN) --filter ./api build
+build: ## build web (bundled into the worker as ASSETS)
 	$(BUN) --filter ./web build
 
-deploy-api: build ## deploy api worker
-	$(BUN) --filter ./api deploy
+# Single Worker serves api + web/dist. Auth is via the project-account
+# API token in what_i_need.md (NOT `wrangler login`, which lands on the
+# wrong CF account). See llm/deploy.md.
+prod-logs: ## stream live worker logs from smm-api (wrangler tail)
+	@test -f what_i_need.md || (echo "what_i_need.md missing" && exit 1)
+	cd api && \
+	  CLOUDFLARE_API_TOKEN=$$(grep '^CLOUDFLARE_API_TOKEN=' ../what_i_need.md | cut -d= -f2) \
+	  CLOUDFLARE_ACCOUNT_ID=$$(grep '^CLOUDFLARE_ACCOUNT_ID=' ../what_i_need.md | cut -d= -f2) \
+	  $(BUN) x wrangler tail -c wrangler.local.toml --format pretty
 
-deploy-web: ## deploy web to Pages
-	$(BUN) --filter ./web build
-	$(BUN) --filter ./web deploy
-
-deploy: deploy-api deploy-web ## deploy everything
+deploy: build ## build web + deploy worker (api + spa) to smm.table.pw
+	@test -f what_i_need.md || (echo "what_i_need.md missing — can't read CLOUDFLARE_API_TOKEN" && exit 1)
+	cd api && \
+	  CLOUDFLARE_API_TOKEN=$$(grep '^CLOUDFLARE_API_TOKEN=' ../what_i_need.md | cut -d= -f2) \
+	  CLOUDFLARE_ACCOUNT_ID=$$(grep '^CLOUDFLARE_ACCOUNT_ID=' ../what_i_need.md | cut -d= -f2) \
+	  $(BUN) x wrangler deploy -c wrangler.local.toml
 	@echo "deployed at $(TS)"

@@ -2,17 +2,27 @@
 // See plan/platforms/instagram.md.
 //
 // The publish path requires public HTTPS URLs for media — we mint
-// short-lived signed R2 URLs via the lib/r2.ts helper.
+// short-lived HMAC-signed URLs via lib/media-signing.ts that point at
+// /api/media/public/<id> on this Worker. No R2 access keys involved.
 
 import type { PlatformAdapter, PublishInput, PublishResult } from "./types.ts";
 import { redirectUri } from "./types.ts";
 import type { Env } from "../env.ts";
 import { HttpError } from "../lib/errors.ts";
+import { signMediaUrl } from "../lib/media-signing.ts";
 
 const AUTHORIZE = "https://api.instagram.com/oauth/authorize";
 const TOKEN_SHORT = "https://api.instagram.com/oauth/access_token";
 const GRAPH = "https://graph.instagram.com";
+const GRAPH_VERSION = "v25.0";
 const SCOPES = "instagram_business_basic,instagram_business_content_publish";
+
+// Container status poll: how long to wait between checks, max checks.
+// Images usually FINISH instantly; videos can take 30–120s.
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 30;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const instagram: PlatformAdapter = {
   platform: "instagram",
@@ -94,12 +104,139 @@ const instagram: PlatformAdapter = {
     };
   },
 
-  async publish(_env, _input): Promise<PublishResult> {
-    // TODO: container + publish flow. Requires public URLs for media —
-    // implement once R2 signed-URL helper lands. For now, emit a clear
-    // not-implemented to avoid silent half-publishes.
-    throw new HttpError(501, "ig_publish_not_implemented", "instagram publish path is stubbed; needs R2 public URL helper");
+  async publish(env, input): Promise<PublishResult> {
+    const igUserId = input.account.externalId;
+    if (!igUserId) {
+      throw new HttpError(400, "ig_missing_user_id", "account has no externalId (IG user id)");
+    }
+    const accessToken = input.account.accessToken;
+    if (!accessToken) {
+      throw new HttpError(400, "ig_missing_token", "account has no access_token");
+    }
+
+    const postKind = (input.draft.platformOptions?.postKind as string | undefined) ?? "image";
+    const caption = input.draft.body || "";
+
+    if (input.media.length === 0) {
+      throw new HttpError(400, "ig_missing_media", "instagram requires at least one media item");
+    }
+
+    let creationId: string;
+    if (postKind === "image") {
+      if (input.media.length !== 1) {
+        throw new HttpError(400, "ig_image_one_file", "image post requires exactly one media item");
+      }
+      const m = input.media[0]!;
+      if (!m.mime.startsWith("image/")) {
+        throw new HttpError(400, "ig_image_mime", `image post requires image/* mime, got ${m.mime}`);
+      }
+      const publicUrl = await signMediaUrl(env, m.id, 86400);
+      creationId = await createContainer(igUserId, accessToken, {
+        image_url: publicUrl,
+        caption,
+      });
+    } else {
+      // Reel + carousel branches land in a follow-up; image-only for v1.
+      throw new HttpError(
+        501,
+        "ig_publish_kind_unsupported",
+        `instagram publish for postKind="${postKind}" not implemented yet`,
+      );
+    }
+
+    await pollContainerReady(creationId, accessToken);
+
+    const platformPostId = await publishContainer(igUserId, creationId, accessToken);
+    const handle = input.account.handle.replace(/^@/, "");
+    return {
+      platformPostId,
+      platformUrl: `https://www.instagram.com/${handle}/p/${platformPostId}/`,
+    };
   },
+};
+
+interface ContainerInput {
+  image_url?: string;
+  video_url?: string;
+  media_type?: "IMAGE" | "REELS" | "CAROUSEL";
+  caption?: string;
+  is_carousel_item?: boolean;
+  children?: string;
+}
+
+const createContainer = async (
+  igUserId: string,
+  accessToken: string,
+  body: ContainerInput,
+): Promise<string> => {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${igUserId}/media`;
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) {
+    if (v != null) form.set(k, String(v));
+  }
+  form.set("access_token", accessToken);
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  const json = (await r.json()) as { id?: string; error?: { message: string } };
+  if (!r.ok || !json.id) {
+    throw new HttpError(
+      502,
+      "ig_container_failed",
+      `container create failed: ${json.error?.message ?? r.statusText}`,
+    );
+  }
+  return json.id;
+};
+
+const pollContainerReady = async (
+  creationId: string,
+  accessToken: string,
+): Promise<void> => {
+  for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${creationId}`);
+    url.searchParams.set("fields", "status_code");
+    url.searchParams.set("access_token", accessToken);
+    const r = await fetch(url.toString());
+    const json = (await r.json()) as {
+      status_code?: string;
+      error?: { message: string };
+    };
+    if (!r.ok) {
+      throw new HttpError(502, "ig_container_status_failed", json.error?.message ?? r.statusText);
+    }
+    if (json.status_code === "FINISHED") return;
+    if (json.status_code === "ERROR" || json.status_code === "EXPIRED") {
+      throw new HttpError(502, "ig_container_bad_status", `container status: ${json.status_code}`);
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+  throw new HttpError(504, "ig_container_timeout", "container never reached FINISHED");
+};
+
+const publishContainer = async (
+  igUserId: string,
+  creationId: string,
+  accessToken: string,
+): Promise<string> => {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${igUserId}/media_publish`;
+  const form = new URLSearchParams({ creation_id: creationId, access_token: accessToken });
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  const json = (await r.json()) as { id?: string; error?: { message: string } };
+  if (!r.ok || !json.id) {
+    throw new HttpError(
+      502,
+      "ig_publish_failed",
+      `media_publish failed: ${json.error?.message ?? r.statusText}`,
+    );
+  }
+  return json.id;
 };
 
 export default instagram;
